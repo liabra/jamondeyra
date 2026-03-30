@@ -1,3 +1,4 @@
 node_modules/
 .env
 data/admin.json
+data/users.json

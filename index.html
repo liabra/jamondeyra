@@ -656,6 +656,7 @@
       <h1>Administration – Jamondeyra</h1>
     </div>
     <div style="display:flex;gap:1rem;align-items:center;">
+      <span id="adminUserBadge" style="font-size:0.82rem;color:rgba(255,255,255,0.75);background:rgba(255,255,255,0.1);padding:4px 12px;border-radius:50px;"></span>
       <a href="#" onclick="closeAdmin()" style="color:rgba(255,255,255,0.7);text-decoration:none;font-size:0.9rem;font-weight:600;">👁 Voir le site</a>
       <button onclick="logout()" style="background:var(--orange);color:white;border:none;padding:10px 20px;border-radius:50px;font-family:'Nunito',sans-serif;font-weight:700;cursor:pointer;">Déconnexion</button>
     </div>
@@ -667,7 +668,8 @@
       <button class="admin-tab" onclick="switchTab('gallery')">📸 Galerie</button>
       <button class="admin-tab" onclick="switchTab('temoignages')">⭐ Témoignages</button>
       <button class="admin-tab" onclick="switchTab('drive')">📁 Espace parents</button>
-      <button class="admin-tab" onclick="switchTab('settings')">⚙️ Paramètres</button>
+      <button class="admin-tab" id="tab-btn-settings" onclick="switchTab('settings')">⚙️ Paramètres</button>
+      <button class="admin-tab" id="tab-btn-comptes" onclick="switchTab('comptes')">👥 Comptes</button>
     </div>
     <div class="admin-section active" id="tab-news">
       <div class="admin-card"><h3>📰 Gérer les actualités</h3><button class="btn-add" onclick="openAddNews()">+ Nouvelle actualité</button><div class="items-list" id="adminNewsList"></div></div>
@@ -711,6 +713,14 @@
         <div class="admin-form-group"><label>Nouveau mot de passe admin</label><input type="password" id="settingPwd" placeholder="Laisser vide pour ne pas changer"></div>
         <button class="btn-save" onclick="saveSettings()">💾 Enregistrer</button>
       </div>
+    <div class="admin-section" id="tab-comptes">
+      <div class="admin-card">
+        <h3>👥 Gestion des comptes</h3>
+        <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1.5rem;">Le compte <strong>admin</strong> est géré via les variables d'environnement Railway.</p>
+        <button class="btn-add" onclick="openAddUser()">+ Nouveau compte</button>
+        <div class="items-list" id="adminUsersList"></div>
+      </div>
+    </div>
     </div>
   </div>
 </div>
@@ -794,29 +804,46 @@ function toggleNav(){document.getElementById('navLinks').classList.toggle('open'
 
 function openAdminLogin(){document.getElementById('loginModal').classList.add('active');document.getElementById('loginError').style.display='none';}
 function closeAdminLogin(){document.getElementById('loginModal').classList.remove('active');}
+let currentUser={username:'',role:''};
+
 async function doLogin(){
+  const u=document.getElementById('loginUser').value.trim();
   const p=document.getElementById('loginPass').value;
-  if(!p)return;
+  if(!u||!p)return;
   try{
-    const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:p})});
-    if(r.ok){closeAdminLogin();openAdmin();}
+    const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    if(r.ok){const d=await r.json();currentUser={username:d.username,role:d.role};closeAdminLogin();openAdmin();}
     else{document.getElementById('loginError').style.display='block';}
   }catch{document.getElementById('loginError').style.display='block';}
 }
 async function openAdmin(){
   const r=await fetch('/api/me').catch(()=>({ok:false}));
   if(!r.ok){toast('Session expirée, veuillez vous reconnecter.');return;}
+  const me=await r.json();
+  currentUser={username:me.username,role:me.role};
+  const isSA=currentUser.role==='super_admin';
+  // Badge topbar
+  const badge=document.getElementById('adminUserBadge');
+  if(badge)badge.textContent=currentUser.username+' · '+(isSA?'Super admin':'Éditeur');
+  // Affichage conditionnel des onglets réservés
+  const tS=document.getElementById('tab-btn-settings');
+  const tC=document.getElementById('tab-btn-comptes');
+  if(tS)tS.style.display=isSA?'':'none';
+  if(tC)tC.style.display=isSA?'':'none';
   document.getElementById('adminPanel').classList.add('active');
   renderAdminAll();
 }
 function closeAdmin(){document.getElementById('adminPanel').classList.remove('active');}
-async function logout(){await fetch('/api/logout',{method:'POST'}).catch(()=>{});closeAdmin();}
+async function logout(){await fetch('/api/logout',{method:'POST'}).catch(()=>{});currentUser={username:'',role:''};closeAdmin();}
 
 function switchTab(tab){
-  const tabs=['news','services','gallery','temoignages','drive','settings'];
-  document.querySelectorAll('.admin-tab').forEach((t,i)=>t.classList.toggle('active',tabs[i]===tab));
+  document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active'));
+  const btn=document.getElementById('tab-btn-'+tab);
+  if(btn)btn.classList.add('active');
+  else document.querySelectorAll('.admin-tab')[['news','services','gallery','temoignages','drive'].indexOf(tab)]?.classList.add('active');
   document.querySelectorAll('.admin-section').forEach(s=>s.classList.remove('active'));
   document.getElementById('tab-'+tab).classList.add('active');
+  if(tab==='comptes')renderAdminUsers();
 }
 
 function renderAdminNews(){document.getElementById('adminNewsList').innerHTML=news.map(n=>`<div class="item-row"><div class="item-row-info"><h4>${n.emoji} ${n.title}</h4><p>${n.date} · ${n.cat}</p></div><div class="item-row-actions"><button class="btn-edit" onclick="editNews(${n.id})">✏️</button><button class="btn-del" onclick="delNews(${n.id})">🗑️</button></div></div>`).join('')||'<p style="color:var(--muted);font-size:0.85rem;">Aucune actualité.</p>';}
@@ -825,7 +852,23 @@ function renderAdminGallery(){document.getElementById('adminGalleryList').innerH
 function renderAdminTemoignages(){document.getElementById('adminTemoignagesList').innerHTML=temoignages.map(t=>`<div class="item-row"><div class="item-row-info"><h4>${t.name}</h4><p>${t.text.substring(0,55)}…</p></div><div class="item-row-actions"><button class="btn-edit" onclick="editTemoignage(${t.id})">✏️</button><button class="btn-del" onclick="delTemoignage(${t.id})">🗑️</button></div></div>`).join('');}
 function renderAdminDrive(){document.getElementById('driveLinkInput').value=driveData.link||'';document.getElementById('adminDriveList').innerHTML=driveData.cards.map(c=>`<div class="item-row"><div class="item-row-info"><h4>${c.emoji} ${c.title}</h4><p>${c.desc}</p></div><div class="item-row-actions"><button class="btn-del" onclick="delDriveCard(${c.id})">🗑️</button></div></div>`).join('');}
 function renderAdminSettings(){document.getElementById('settingName').value=settings.name||'';document.getElementById('settingAddress').value=settings.address||'';document.getElementById('settingEmail').value=settings.email||'';document.getElementById('settingPhone').value=settings.phone||'';document.getElementById('settingHours').value=settings.hours||'';document.getElementById('settingFb').value=settings.fb||'';document.getElementById('settingIg').value=settings.ig||'';}
-function renderAdminAll(){renderAdminNews();renderAdminServices();renderAdminGallery();renderAdminTemoignages();renderAdminDrive();renderAdminSettings();}
+function renderAdminAll(){renderAdminNews();renderAdminServices();renderAdminGallery();renderAdminTemoignages();renderAdminDrive();if(currentUser.role==='super_admin')renderAdminSettings();}
+
+async function renderAdminUsers(){
+  const r=await fetch('/api/users').catch(()=>null);
+  if(!r||!r.ok){document.getElementById('adminUsersList').innerHTML='<p style="color:var(--muted)">Erreur de chargement.</p>';return;}
+  const users=await r.json();
+  document.getElementById('adminUsersList').innerHTML=users.map(u=>`<div class="item-row"><div class="item-row-info"><h4>${u.username}</h4><p>${u.role==='super_admin'?'Super admin':'Éditeur'}${u.builtin?' · compte système':''}</p></div><div class="item-row-actions">${!u.builtin?`<button class="btn-edit" onclick="openEditUserPwd('${u.username}')">🔑</button><button class="btn-del" onclick="delUser('${u.username}')">🗑️</button>`:''}</div></div>`).join('')||'<p style="color:var(--muted);font-size:0.85rem;">Aucun compte supplémentaire.</p>';
+}
+function openAddUser(){
+  openEditModal('➕ Nouveau compte',`<div class="admin-form-row"><div class="admin-form-group"><label>Identifiant</label><input id="uf_username" placeholder="marie" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div><div class="admin-form-group"><label>Rôle</label><select id="uf_role" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"><option value="editor">Éditeur</option><option value="super_admin">Super admin</option></select></div></div><div class="admin-form-group"><label>Mot de passe</label><input type="password" id="uf_pwd" placeholder="8 caractères minimum" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div>`,
+  async()=>{const r=await fetch('/api/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:v('uf_username'),password:v('uf_pwd'),role:v('uf_role')})});if(!r.ok){const e=await r.json();toast('⚠️ '+(e.error||'Erreur'));return;}closeEditModal();renderAdminUsers();toast('Compte créé !');});
+}
+function openEditUserPwd(username){
+  openEditModal(`🔑 Mot de passe — ${username}`,`<div class="admin-form-group"><label>Nouveau mot de passe</label><input type="password" id="uf_newpwd" placeholder="8 caractères minimum" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div>`,
+  async()=>{const r=await fetch(`/api/users/${username}/password`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({newPassword:v('uf_newpwd')})});if(!r.ok){const e=await r.json();toast('⚠️ '+(e.error||'Erreur'));return;}closeEditModal();toast('Mot de passe mis à jour !');});
+}
+async function delUser(username){if(!confirm(`Supprimer le compte "${username}" ?`))return;const r=await fetch(`/api/users/${username}`,{method:'DELETE'});if(!r.ok){const e=await r.json();toast('⚠️ '+(e.error||'Erreur'));return;}renderAdminUsers();toast('Compte supprimé !');}
 
 let editModalSaveCallback=null;
 function openEditModal(title,bodyHTML,cb){document.getElementById('editModalTitle').textContent=title;document.getElementById('editModalBody').innerHTML=bodyHTML;editModalSaveCallback=cb;document.getElementById('editModal').classList.add('active');}
@@ -855,6 +898,7 @@ function delDriveCard(id){driveData.cards=driveData.cards.filter(x=>x.id!==id);a
 function saveDrive(){driveData.link=document.getElementById('driveLinkInput').value;apiSave('drive',driveData);renderDrive();toast('Drive enregistré !');}
 
 async function saveSettings(){
+  if(currentUser.role!=='super_admin'){toast('⚠️ Accès refusé');return;}
   settings={name:v('settingName'),address:v('settingAddress'),email:v('settingEmail'),phone:v('settingPhone'),hours:v('settingHours'),fb:v('settingFb'),ig:v('settingIg')};
   apiSave('settings',settings);
   renderContact();
