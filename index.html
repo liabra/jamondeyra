@@ -718,9 +718,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const STORAGE={news:'jey_news',services:'jey_services',gallery:'jey_gallery',temoignages:'jey_temoignages',drive:'jey_drive',settings:'jey_settings',pwd:'jey_pwd'};
-function load(k,d){try{return JSON.parse(localStorage.getItem(k))||d;}catch{return d;}}
-function save(k,v){localStorage.setItem(k,JSON.stringify(v));}
+function apiSave(key,data){fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,data})}).then(r=>{if(!r.ok)toast('⚠️ Erreur de sauvegarde');}).catch(()=>toast('⚠️ Erreur réseau'));}
 
 const defaultNews=[
   {id:1,title:"Kermesse de fin d'année 🎉",date:"15 juin 2025",cat:"Événement",emoji:"🎪",content:"Grande fête de fin d'année avec jeux, stands gourmands et spectacle des enfants. Toutes les familles sont invitées !",color:"#D4691E"},
@@ -752,13 +750,12 @@ const defaultDrive={link:"https://drive.google.com",cards:[
   {id:4,emoji:"📸",title:"Photos de classe",desc:"Albums partagés"},
 ]};
 
-let news=load(STORAGE.news,defaultNews);
-let services=load(STORAGE.services,defaultServices);
-let gallery=load(STORAGE.gallery,defaultGallery);
-let temoignages=load(STORAGE.temoignages,defaultTemoignages);
-let driveData=load(STORAGE.drive,defaultDrive);
-let settings=load(STORAGE.settings,{name:"École Jamondeyra",address:"Parc du château de l'Hermitage\nPontoise – Ennery, Val-d'Oise",email:"contact@ecolejamondeyra.fr",phone:"",hours:"Lun–Ven : 8h20 – 17h00\nGarderie : 7h30–8h20 / 17h–19h",fb:"https://www.facebook.com/people/Ecole-Jamondeyra/100063759752377/",ig:"https://www.instagram.com/ecole_jamondeyra_bilingue/"});
-let adminPwd=load(STORAGE.pwd,"admin123");
+let news=[...defaultNews];
+let services=[...defaultServices];
+let gallery=[...defaultGallery];
+let temoignages=[...defaultTemoignages];
+let driveData={...defaultDrive,cards:[...defaultDrive.cards]};
+let settings={name:"École Jamondeyra",address:"Parc du château de l'Hermitage\nPontoise – Ennery, Val-d'Oise",email:"contact@ecolejamondeyra.fr",phone:"",hours:"Lun–Ven : 8h20 – 17h00\nGarderie : 7h30–8h20 / 17h–19h",fb:"https://www.facebook.com/people/Ecole-Jamondeyra/100063759752377/",ig:"https://www.instagram.com/ecole_jamondeyra_bilingue/"};
 
 function renderNews(){
   const g=document.getElementById('newsGrid');
@@ -797,15 +794,23 @@ function toggleNav(){document.getElementById('navLinks').classList.toggle('open'
 
 function openAdminLogin(){document.getElementById('loginModal').classList.add('active');document.getElementById('loginError').style.display='none';}
 function closeAdminLogin(){document.getElementById('loginModal').classList.remove('active');}
-function doLogin(){
-  const u=document.getElementById('loginUser').value;
+async function doLogin(){
   const p=document.getElementById('loginPass').value;
-  if(u==='admin'&&p===adminPwd){closeAdminLogin();openAdmin();}
-  else{document.getElementById('loginError').style.display='block';}
+  if(!p)return;
+  try{
+    const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:p})});
+    if(r.ok){closeAdminLogin();openAdmin();}
+    else{document.getElementById('loginError').style.display='block';}
+  }catch{document.getElementById('loginError').style.display='block';}
 }
-function openAdmin(){document.getElementById('adminPanel').classList.add('active');renderAdminAll();}
+async function openAdmin(){
+  const r=await fetch('/api/me').catch(()=>({ok:false}));
+  if(!r.ok){toast('Session expirée, veuillez vous reconnecter.');return;}
+  document.getElementById('adminPanel').classList.add('active');
+  renderAdminAll();
+}
 function closeAdmin(){document.getElementById('adminPanel').classList.remove('active');}
-function logout(){closeAdmin();}
+async function logout(){await fetch('/api/logout',{method:'POST'}).catch(()=>{});closeAdmin();}
 
 function switchTab(tab){
   const tabs=['news','services','gallery','temoignages','drive','settings'];
@@ -828,34 +833,65 @@ function closeEditModal(){document.getElementById('editModal').classList.remove(
 function saveEditModal(){if(editModalSaveCallback)editModalSaveCallback();}
 
 function newsForm(n={}){return `<div class="admin-form-group"><label>Titre</label><input id="ef_title" value="${n.title||''}" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:0.9rem;outline:none;"></div><div class="admin-form-row"><div class="admin-form-group"><label>Date</label><input id="ef_date" value="${n.date||''}" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:0.9rem;outline:none;"></div><div class="admin-form-group"><label>Catégorie</label><input id="ef_cat" value="${n.cat||'Actualité'}" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:0.9rem;outline:none;"></div></div><div class="admin-form-row"><div class="admin-form-group"><label>Emoji</label><input id="ef_emoji" value="${n.emoji||'📰'}" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:0.9rem;outline:none;"></div><div class="admin-form-group"><label>Couleur</label><input type="color" id="ef_color" value="${n.color||'#D4691E'}" style="height:42px;padding:4px;width:100%;border:2px solid #e5e7eb;border-radius:10px;"></div></div><div class="admin-form-group"><label>Contenu</label><textarea id="ef_content" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:0.9rem;outline:none;min-height:100px;resize:vertical;">${n.content||''}</textarea></div>`;}
-function openAddNews(){openEditModal('➕ Nouvelle actualité',newsForm(),()=>{news.unshift({id:Date.now(),title:v('ef_title'),date:v('ef_date'),cat:v('ef_cat'),emoji:v('ef_emoji'),color:v('ef_color'),content:v('ef_content')});save(STORAGE.news,news);renderNews();renderAdminNews();closeEditModal();toast('Actualité ajoutée !');});}
-function editNews(id){const n=news.find(x=>x.id===id);openEditModal('✏️ Modifier l\'actualité',newsForm(n),()=>{Object.assign(n,{title:v('ef_title'),date:v('ef_date'),cat:v('ef_cat'),emoji:v('ef_emoji'),color:v('ef_color'),content:v('ef_content')});save(STORAGE.news,news);renderNews();renderAdminNews();closeEditModal();toast('Modifié !');});}
-function delNews(id){if(!confirm('Supprimer ?'))return;news=news.filter(x=>x.id!==id);save(STORAGE.news,news);renderNews();renderAdminNews();toast('Supprimé !');}
+function openAddNews(){openEditModal('➕ Nouvelle actualité',newsForm(),()=>{news.unshift({id:Date.now(),title:v('ef_title'),date:v('ef_date'),cat:v('ef_cat'),emoji:v('ef_emoji'),color:v('ef_color'),content:v('ef_content')});apiSave('news',news);renderNews();renderAdminNews();closeEditModal();toast('Actualité ajoutée !');});}
+function editNews(id){const n=news.find(x=>x.id===id);openEditModal('✏️ Modifier l\'actualité',newsForm(n),()=>{Object.assign(n,{title:v('ef_title'),date:v('ef_date'),cat:v('ef_cat'),emoji:v('ef_emoji'),color:v('ef_color'),content:v('ef_content')});apiSave('news',news);renderNews();renderAdminNews();closeEditModal();toast('Modifié !');});}
+function delNews(id){if(!confirm('Supprimer ?'))return;news=news.filter(x=>x.id!==id);apiSave('news',news);renderNews();renderAdminNews();toast('Supprimé !');}
 
 function serviceForm(s={}){return `<div class="admin-form-row"><div class="admin-form-group"><label>Emoji</label><input id="sf_emoji" value="${s.emoji||'⭐'}" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div><div class="admin-form-group"><label>Titre</label><input id="sf_title" value="${s.title||''}" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div></div><div class="admin-form-group"><label>Description</label><textarea id="sf_desc" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;min-height:100px;resize:vertical;">${s.desc||''}</textarea></div>`;}
-function openAddService(){openEditModal('➕ Nouveau service',serviceForm(),()=>{services.push({id:Date.now(),emoji:v('sf_emoji'),title:v('sf_title'),desc:v('sf_desc')});save(STORAGE.services,services);renderServices();renderAdminServices();closeEditModal();toast('Service ajouté !');});}
-function editService(id){const s=services.find(x=>x.id===id);openEditModal('✏️ Modifier',serviceForm(s),()=>{Object.assign(s,{emoji:v('sf_emoji'),title:v('sf_title'),desc:v('sf_desc')});save(STORAGE.services,services);renderServices();renderAdminServices();closeEditModal();toast('Modifié !');});}
-function delService(id){if(!confirm('Supprimer ?'))return;services=services.filter(x=>x.id!==id);save(STORAGE.services,services);renderServices();renderAdminServices();toast('Supprimé !');}
+function openAddService(){openEditModal('➕ Nouveau service',serviceForm(),()=>{services.push({id:Date.now(),emoji:v('sf_emoji'),title:v('sf_title'),desc:v('sf_desc')});apiSave('services',services);renderServices();renderAdminServices();closeEditModal();toast('Service ajouté !');});}
+function editService(id){const s=services.find(x=>x.id===id);openEditModal('✏️ Modifier',serviceForm(s),()=>{Object.assign(s,{emoji:v('sf_emoji'),title:v('sf_title'),desc:v('sf_desc')});apiSave('services',services);renderServices();renderAdminServices();closeEditModal();toast('Modifié !');});}
+function delService(id){if(!confirm('Supprimer ?'))return;services=services.filter(x=>x.id!==id);apiSave('services',services);renderServices();renderAdminServices();toast('Supprimé !');}
 
-function openAddGallery(){openEditModal('➕ Photo',`<div class="admin-form-group"><label>Label</label><input id="gf_label" placeholder="Atelier peinture" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div><div class="admin-form-group"><label>Emoji</label><input id="gf_emoji" placeholder="🎨" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div><div class="admin-form-group"><label>URL image (optionnel)</label><input type="url" id="gf_url" placeholder="https://..." style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div>`,()=>{gallery.push({id:Date.now(),label:v('gf_label'),emoji:v('gf_emoji'),url:v('gf_url')});save(STORAGE.gallery,gallery);renderGallery();renderAdminGallery();closeEditModal();toast('Photo ajoutée !');});}
-function delGallery(id){if(!confirm('Supprimer ?'))return;gallery=gallery.filter(x=>x.id!==id);save(STORAGE.gallery,gallery);renderGallery();renderAdminGallery();toast('Supprimé !');}
+function openAddGallery(){openEditModal('➕ Photo',`<div class="admin-form-group"><label>Label</label><input id="gf_label" placeholder="Atelier peinture" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div><div class="admin-form-group"><label>Emoji</label><input id="gf_emoji" placeholder="🎨" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div><div class="admin-form-group"><label>URL image (optionnel)</label><input type="url" id="gf_url" placeholder="https://..." style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div>`,()=>{gallery.push({id:Date.now(),label:v('gf_label'),emoji:v('gf_emoji'),url:v('gf_url')});apiSave('gallery',gallery);renderGallery();renderAdminGallery();closeEditModal();toast('Photo ajoutée !');});}
+function delGallery(id){if(!confirm('Supprimer ?'))return;gallery=gallery.filter(x=>x.id!==id);apiSave('gallery',gallery);renderGallery();renderAdminGallery();toast('Supprimé !');}
 
 function temoignageForm(t={}){return `<div class="admin-form-row"><div class="admin-form-group"><label>Nom</label><input id="tf_name" value="${t.name||''}" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div><div class="admin-form-group"><label>Date</label><input id="tf_date" value="${t.date||''}" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div></div><div class="admin-form-row"><div class="admin-form-group"><label>Initiale</label><input id="tf_initial" value="${t.initial||'A'}" maxlength="1" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div><div class="admin-form-group"><label>Couleur avatar</label><input type="color" id="tf_color" value="${t.color||'#D4691E'}" style="height:42px;padding:4px;width:100%;border:2px solid #e5e7eb;border-radius:10px;"></div></div><div class="admin-form-group"><label>Note</label><select id="tf_stars" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"><option ${t.stars==5?'selected':''}  value="5">⭐⭐⭐⭐⭐</option><option ${t.stars==4?'selected':''}  value="4">⭐⭐⭐⭐</option><option ${t.stars==3?'selected':''}  value="3">⭐⭐⭐</option></select></div><div class="admin-form-group"><label>Témoignage</label><textarea id="tf_text" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;min-height:100px;resize:vertical;">${t.text||''}</textarea></div>`;}
-function openAddTemoignage(){openEditModal('➕ Témoignage',temoignageForm(),()=>{temoignages.push({id:Date.now(),name:v('tf_name'),date:v('tf_date'),initial:v('tf_initial'),color:v('tf_color'),stars:parseInt(v('tf_stars')),text:v('tf_text')});save(STORAGE.temoignages,temoignages);renderTemoignages();renderAdminTemoignages();closeEditModal();toast('Ajouté !');});}
-function editTemoignage(id){const t=temoignages.find(x=>x.id===id);openEditModal('✏️ Modifier',temoignageForm(t),()=>{Object.assign(t,{name:v('tf_name'),date:v('tf_date'),initial:v('tf_initial'),color:v('tf_color'),stars:parseInt(v('tf_stars')),text:v('tf_text')});save(STORAGE.temoignages,temoignages);renderTemoignages();renderAdminTemoignages();closeEditModal();toast('Modifié !');});}
-function delTemoignage(id){if(!confirm('Supprimer ?'))return;temoignages=temoignages.filter(x=>x.id!==id);save(STORAGE.temoignages,temoignages);renderTemoignages();renderAdminTemoignages();toast('Supprimé !');}
+function openAddTemoignage(){openEditModal('➕ Témoignage',temoignageForm(),()=>{temoignages.push({id:Date.now(),name:v('tf_name'),date:v('tf_date'),initial:v('tf_initial'),color:v('tf_color'),stars:parseInt(v('tf_stars')),text:v('tf_text')});apiSave('temoignages',temoignages);renderTemoignages();renderAdminTemoignages();closeEditModal();toast('Ajouté !');});}
+function editTemoignage(id){const t=temoignages.find(x=>x.id===id);openEditModal('✏️ Modifier',temoignageForm(t),()=>{Object.assign(t,{name:v('tf_name'),date:v('tf_date'),initial:v('tf_initial'),color:v('tf_color'),stars:parseInt(v('tf_stars')),text:v('tf_text')});apiSave('temoignages',temoignages);renderTemoignages();renderAdminTemoignages();closeEditModal();toast('Modifié !');});}
+function delTemoignage(id){if(!confirm('Supprimer ?'))return;temoignages=temoignages.filter(x=>x.id!==id);apiSave('temoignages',temoignages);renderTemoignages();renderAdminTemoignages();toast('Supprimé !');}
 
-function openAddDriveCard(){openEditModal('➕ Raccourci Drive',`<div class="admin-form-row"><div class="admin-form-group"><label>Emoji</label><input id="dc_emoji" placeholder="📄" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div><div class="admin-form-group"><label>Titre</label><input id="dc_title" placeholder="Calendrier" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div></div><div class="admin-form-group"><label>Description</label><input id="dc_desc" placeholder="PDF disponible" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div>`,()=>{driveData.cards.push({id:Date.now(),emoji:v('dc_emoji'),title:v('dc_title'),desc:v('dc_desc')});save(STORAGE.drive,driveData);renderDrive();renderAdminDrive();closeEditModal();toast('Ajouté !');});}
-function delDriveCard(id){driveData.cards=driveData.cards.filter(x=>x.id!==id);save(STORAGE.drive,driveData);renderDrive();renderAdminDrive();toast('Supprimé !');}
-function saveDrive(){driveData.link=document.getElementById('driveLinkInput').value;save(STORAGE.drive,driveData);renderDrive();toast('Drive enregistré !');}
+function openAddDriveCard(){openEditModal('➕ Raccourci Drive',`<div class="admin-form-row"><div class="admin-form-group"><label>Emoji</label><input id="dc_emoji" placeholder="📄" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div><div class="admin-form-group"><label>Titre</label><input id="dc_title" placeholder="Calendrier" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div></div><div class="admin-form-group"><label>Description</label><input id="dc_desc" placeholder="PDF disponible" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div>`,()=>{driveData.cards.push({id:Date.now(),emoji:v('dc_emoji'),title:v('dc_title'),desc:v('dc_desc')});apiSave('drive',driveData);renderDrive();renderAdminDrive();closeEditModal();toast('Ajouté !');});}
+function delDriveCard(id){driveData.cards=driveData.cards.filter(x=>x.id!==id);apiSave('drive',driveData);renderDrive();renderAdminDrive();toast('Supprimé !');}
+function saveDrive(){driveData.link=document.getElementById('driveLinkInput').value;apiSave('drive',driveData);renderDrive();toast('Drive enregistré !');}
 
-function saveSettings(){settings={name:v('settingName'),address:v('settingAddress'),email:v('settingEmail'),phone:v('settingPhone'),hours:v('settingHours'),fb:v('settingFb'),ig:v('settingIg')};save(STORAGE.settings,settings);const np=v('settingPwd');if(np){adminPwd=np;save(STORAGE.pwd,adminPwd);}renderContact();toast('Paramètres enregistrés !');}
+async function saveSettings(){
+  settings={name:v('settingName'),address:v('settingAddress'),email:v('settingEmail'),phone:v('settingPhone'),hours:v('settingHours'),fb:v('settingFb'),ig:v('settingIg')};
+  apiSave('settings',settings);
+  renderContact();
+  const np=v('settingPwd');
+  if(np){
+    if(np.length<8){toast('⚠️ Mot de passe trop court (8 caractères min)');return;}
+    const r=await fetch('/api/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({newPassword:np})});
+    if(!r.ok){const e=await r.json();toast('⚠️ '+(e.error||'Erreur'));return;}
+    document.getElementById('settingPwd').value='';
+    toast('Mot de passe mis à jour. Reconnectez-vous.');
+    setTimeout(()=>logout(),1500);
+    return;
+  }
+  toast('Paramètres enregistrés !');
+}
 function submitContact(){toast('Message envoyé ! Nous vous répondrons rapidement. 😊');}
 function v(id){const el=document.getElementById(id);return el?el.value:'';}
 function toast(msg){const t=document.getElementById('toast');t.textContent='✅ '+msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 document.getElementById('loginModal').addEventListener('click',function(e){if(e.target===this)closeAdminLogin();});
 document.getElementById('editModal').addEventListener('click',function(e){if(e.target===this)closeEditModal();});
-renderAll();
+
+async function init(){
+  try{
+    const r=await fetch('/api/content');
+    if(r.ok){
+      const c=await r.json();
+      if(c.news?.length)        news        = c.news;
+      if(c.services?.length)    services    = c.services;
+      if(c.gallery?.length)     gallery     = c.gallery;
+      if(c.temoignages?.length) temoignages = c.temoignages;
+      if(c.drive)               driveData   = c.drive;
+      if(c.settings)            settings    = Object.assign(settings, c.settings);
+    }
+  }catch(e){}
+  renderAll();
+}
+init();
 </script>
 </body>
 </html>
