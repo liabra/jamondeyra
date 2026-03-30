@@ -276,11 +276,16 @@
     background:rgba(255,255,255,0.15); border-radius:var(--radius);
     padding:1.5rem 2rem; backdrop-filter:blur(10px);
     border:1.5px solid rgba(255,255,255,0.25); text-align:center; color:#fff; transition:all 0.25s;
+    position:relative; text-decoration:none; display:block;
   }
-  .drive-card:hover { background:rgba(255,255,255,0.25); transform:translateY(-3px); }
+  a.drive-card { cursor:pointer; }
+  a.drive-card:hover { background:rgba(255,255,255,0.28); transform:translateY(-4px); box-shadow:0 12px 32px rgba(0,0,0,0.25); }
+  div.drive-card:hover { background:rgba(255,255,255,0.22); transform:translateY(-2px); }
   .drive-card .d-icon { font-size:2.5rem; margin-bottom:0.8rem; }
   .drive-card h4 { font-weight:800; font-size:1rem; margin-bottom:4px; }
   .drive-card p { font-size:0.8rem; opacity:0.85; }
+  .drive-card .d-badge { position:absolute; top:10px; right:10px; background:var(--orange-warm); color:#fff; font-size:0.65rem; font-weight:800; padding:2px 8px; border-radius:50px; text-transform:uppercase; letter-spacing:0.05em; }
+  .drive-card .d-link-hint { font-size:0.72rem; opacity:0.6; margin-top:0.5rem; }
   .btn-drive { background:var(--white); color:var(--green-dark); font-size:1rem; padding:16px 36px; box-shadow:0 8px 24px rgba(0,0,0,0.2); }
   .btn-drive:hover { transform:translateY(-3px); box-shadow:0 14px 32px rgba(0,0,0,0.25); }
 
@@ -731,6 +736,7 @@
         <div class="admin-form-group"><label>Nouveau mot de passe <span style="font-weight:400;color:var(--muted)">(laisser vide pour ne pas changer)</span></label><input type="password" id="settingPwd" placeholder="8 caractères minimum"></div>
         <button class="btn-save" onclick="saveSettings()">💾 Enregistrer</button>
       </div>
+    </div>
     <div class="admin-section" id="tab-comptes">
       <div class="admin-card">
         <h3>👥 Gestion des comptes</h3>
@@ -772,10 +778,10 @@ const defaultTemoignages=[
   {id:3,name:"Audrey Fortin",text:"Une confiance sans faille quant au personnel et à la direction de cette belle école ! De magnifiques moments en perspective, entre partage et créativité. Foncez !",stars:5,color:"#4ECDC4",initial:"A",date:"Juin 2019"},
 ];
 const defaultDrive={link:"https://drive.google.com",cards:[
-  {id:1,emoji:"📅",title:"Calendrier scolaire",desc:"Dates et vacances"},
-  {id:2,emoji:"📋",title:"Règlement intérieur",desc:"PDF à lire"},
-  {id:3,emoji:"🍽️",title:"Menus cantine",desc:"Semaine en cours"},
-  {id:4,emoji:"📸",title:"Photos de classe",desc:"Albums partagés"},
+  {id:1,emoji:"📅",title:"Calendrier scolaire",desc:"Dates et vacances",url:"",badge:""},
+  {id:2,emoji:"📋",title:"Règlement intérieur",desc:"PDF à lire",url:"",badge:""},
+  {id:3,emoji:"🍽️",title:"Menus cantine",desc:"Semaine en cours",url:"",badge:"Nouveau"},
+  {id:4,emoji:"📸",title:"Photos de classe",desc:"Albums partagés",url:"",badge:""},
 ]};
 
 let news=[...defaultNews];
@@ -802,8 +808,15 @@ function renderTemoignages(){
 }
 function renderDrive(){
   const btn=document.getElementById('driveLinkBtn');
-  if(driveData.link)btn.href=driveData.link;
-  document.getElementById('driveCards').innerHTML=driveData.cards.map(c=>`<div class="drive-card"><div class="d-icon">${c.emoji}</div><h4>${c.title}</h4><p>${c.desc}</p></div>`).join('');
+  if(driveData.link&&driveData.link.startsWith('https://'))btn.href=driveData.link;
+  document.getElementById('driveCards').innerHTML=driveData.cards.map(c=>{
+    const hasUrl=c.url&&c.url.startsWith('https://');
+    const tag=hasUrl?'a':'div';
+    const href=hasUrl?` href="${c.url}" target="_blank" rel="noopener"`:'';
+    const badge=c.badge?`<span class="d-badge">${c.badge}</span>`:'';
+    const hint=hasUrl?`<p class="d-link-hint">Ouvrir →</p>`:'';
+    return `<${tag} class="drive-card"${href}>${badge}<div class="d-icon">${c.emoji}</div><h4>${c.title}</h4><p>${c.desc}</p>${hint}</${tag}>`;
+  }).join('');
 }
 function renderContact(){
   const s=settings;
@@ -902,7 +915,7 @@ function renderAdminNews(){document.getElementById('adminNewsList').innerHTML=ne
 function renderAdminServices(){document.getElementById('adminServicesList').innerHTML=services.map(s=>`<div class="item-row"><div class="item-row-info"><h4>${s.emoji} ${s.title}</h4><p>${s.desc.substring(0,55)}…</p></div><div class="item-row-actions"><button class="btn-edit" onclick="editService(${s.id})">✏️</button><button class="btn-del" onclick="delService(${s.id})">🗑️</button></div></div>`).join('');}
 function renderAdminGallery(){document.getElementById('adminGalleryList').innerHTML=gallery.map(g=>`<div class="item-row"><div class="item-row-info"><h4>${g.emoji||'🖼️'} ${g.label}</h4><p>${g.url||'Emoji'}</p></div><div class="item-row-actions"><button class="btn-del" onclick="delGallery(${g.id})">🗑️</button></div></div>`).join('');}
 function renderAdminTemoignages(){document.getElementById('adminTemoignagesList').innerHTML=temoignages.map(t=>`<div class="item-row"><div class="item-row-info"><h4>${t.name}</h4><p>${t.text.substring(0,55)}…</p></div><div class="item-row-actions"><button class="btn-edit" onclick="editTemoignage(${t.id})">✏️</button><button class="btn-del" onclick="delTemoignage(${t.id})">🗑️</button></div></div>`).join('');}
-function renderAdminDrive(){document.getElementById('driveLinkInput').value=driveData.link||'';document.getElementById('adminDriveList').innerHTML=driveData.cards.map(c=>`<div class="item-row"><div class="item-row-info"><h4>${c.emoji} ${c.title}</h4><p>${c.desc}</p></div><div class="item-row-actions"><button class="btn-del" onclick="delDriveCard(${c.id})">🗑️</button></div></div>`).join('');}
+function renderAdminDrive(){document.getElementById('driveLinkInput').value=driveData.link||'';document.getElementById('adminDriveList').innerHTML=driveData.cards.map(c=>`<div class="item-row"><div class="item-row-info"><h4>${c.emoji} ${c.title}${c.badge?` <span style="background:var(--orange-warm);color:#fff;font-size:0.65rem;font-weight:800;padding:1px 6px;border-radius:50px;vertical-align:middle;">${c.badge}</span>`:''}</h4><p>${c.desc}${c.url?' · 🔗 lien direct':''}</p></div><div class="item-row-actions"><button class="btn-edit" onclick="editDriveCard(${c.id})">✏️</button><button class="btn-del" onclick="delDriveCard(${c.id})">🗑️</button></div></div>`).join('');}
 function renderAdminSettings(){
   const s=settings;
   const f=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val||'';};
@@ -955,7 +968,9 @@ function openAddTemoignage(){openEditModal('➕ Témoignage',temoignageForm(),()
 function editTemoignage(id){const t=temoignages.find(x=>x.id===id);openEditModal('✏️ Modifier',temoignageForm(t),()=>{Object.assign(t,{name:v('tf_name'),date:v('tf_date'),initial:v('tf_initial'),color:v('tf_color'),stars:parseInt(v('tf_stars')),text:v('tf_text')});apiSave('temoignages',temoignages);renderTemoignages();renderAdminTemoignages();closeEditModal();toast('Modifié !');});}
 function delTemoignage(id){if(!confirm('Supprimer ?'))return;temoignages=temoignages.filter(x=>x.id!==id);apiSave('temoignages',temoignages);renderTemoignages();renderAdminTemoignages();toast('Supprimé !');}
 
-function openAddDriveCard(){openEditModal('➕ Raccourci Drive',`<div class="admin-form-row"><div class="admin-form-group"><label>Emoji</label><input id="dc_emoji" placeholder="📄" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div><div class="admin-form-group"><label>Titre</label><input id="dc_title" placeholder="Calendrier" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div></div><div class="admin-form-group"><label>Description</label><input id="dc_desc" placeholder="PDF disponible" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div>`,()=>{driveData.cards.push({id:Date.now(),emoji:v('dc_emoji'),title:v('dc_title'),desc:v('dc_desc')});apiSave('drive',driveData);renderDrive();renderAdminDrive();closeEditModal();toast('Ajouté !');});}
+function driveCardForm(c={}){const s="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;font-size:0.9rem;";return `<div class="admin-form-row"><div class="admin-form-group"><label>Emoji</label><input id="dc_emoji" value="${c.emoji||''}" placeholder="📄" style="${s}"></div><div class="admin-form-group"><label>Titre</label><input id="dc_title" value="${c.title||''}" placeholder="Calendrier" style="${s}"></div></div><div class="admin-form-group"><label>Description courte</label><input id="dc_desc" value="${c.desc||''}" placeholder="PDF disponible" style="${s}"></div><div class="admin-form-group"><label>Lien direct <span style="font-weight:400;color:var(--muted)">(optionnel — ouvre ce document spécifique)</span></label><input type="url" id="dc_url" value="${c.url||''}" placeholder="https://drive.google.com/..." style="${s}"></div><div class="admin-form-group"><label>Badge <span style="font-weight:400;color:var(--muted)">(optionnel — ex: Nouveau, MàJ)</span></label><input id="dc_badge" value="${c.badge||''}" placeholder="Nouveau" style="${s}"></div>`;}
+function openAddDriveCard(){openEditModal('➕ Raccourci Drive',driveCardForm(),()=>{driveData.cards.push({id:Date.now(),emoji:v('dc_emoji'),title:v('dc_title'),desc:v('dc_desc'),url:v('dc_url'),badge:v('dc_badge')});apiSave('drive',driveData);renderDrive();renderAdminDrive();closeEditModal();toast('Ajouté !');});}
+function editDriveCard(id){const c=driveData.cards.find(x=>x.id===id);openEditModal('✏️ Modifier le raccourci',driveCardForm(c),()=>{Object.assign(c,{emoji:v('dc_emoji'),title:v('dc_title'),desc:v('dc_desc'),url:v('dc_url'),badge:v('dc_badge')});apiSave('drive',driveData);renderDrive();renderAdminDrive();closeEditModal();toast('Modifié !');});}
 function delDriveCard(id){driveData.cards=driveData.cards.filter(x=>x.id!==id);apiSave('drive',driveData);renderDrive();renderAdminDrive();toast('Supprimé !');}
 function saveDrive(){driveData.link=document.getElementById('driveLinkInput').value;apiSave('drive',driveData);renderDrive();toast('Drive enregistré !');}
 
