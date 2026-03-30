@@ -567,11 +567,11 @@
     <p class="section-sub">Pour toute question, inscription ou visite, n'hésitez pas à nous contacter.</p>
     <div class="contact-grid">
       <div class="contact-infos">
-        <div class="contact-line"><div class="c-icon">📍</div><div><h4>Adresse</h4><p>Parc du château de l'Hermitage<br>Pontoise – Ennery, Val-d'Oise</p></div></div>
-        <div class="contact-line"><div class="c-icon">📞</div><div><h4>Téléphone</h4><p>À compléter</p></div></div>
-        <div class="contact-line"><div class="c-icon">✉️</div><div><h4>Email</h4><p>contact@ecolejamondeyra.fr</p></div></div>
-        <div class="contact-line"><div class="c-icon">🕐</div><div><h4>Horaires</h4><p>Lun–Ven : 8h20 – 17h00<br>Garderie : 7h30–8h20 / 17h–19h</p></div></div>
-        <div class="contact-line"><div class="c-icon">📱</div><div><h4>Réseaux sociaux</h4><div style="display:flex;gap:8px;margin-top:6px;"><a href="https://www.facebook.com/people/Ecole-Jamondeyra/100063759752377/" target="_blank" style="background:var(--earth-blue);color:white;padding:6px 14px;border-radius:8px;font-size:0.8rem;font-weight:700;text-decoration:none;">Facebook</a><a href="https://www.instagram.com/ecole_jamondeyra_bilingue/" target="_blank" style="background:var(--hand-pink);color:white;padding:6px 14px;border-radius:8px;font-size:0.8rem;font-weight:700;text-decoration:none;">Instagram</a></div></div></div>
+        <div class="contact-line"><div class="c-icon">📍</div><div><h4>Adresse</h4><p id="contactAddress">Parc du château de l'Hermitage<br>Pontoise – Ennery, Val-d'Oise</p></div></div>
+        <div class="contact-line"><div class="c-icon">📞</div><div><h4>Téléphone</h4><p id="contactPhone">À compléter</p></div></div>
+        <div class="contact-line"><div class="c-icon">✉️</div><div><h4>Email</h4><p id="contactEmail">contact@ecolejamondeyra.fr</p></div></div>
+        <div class="contact-line"><div class="c-icon">🕐</div><div><h4>Horaires</h4><p id="contactHours">Lun–Ven : 8h20 – 17h00<br>Garderie : 7h30–8h20 / 17h–19h</p></div></div>
+        <div class="contact-line"><div class="c-icon">📱</div><div><h4>Réseaux sociaux</h4><div id="contactSocial" style="display:flex;gap:8px;margin-top:6px;"><a href="https://www.facebook.com/people/Ecole-Jamondeyra/100063759752377/" target="_blank" style="background:var(--earth-blue);color:white;padding:6px 14px;border-radius:8px;font-size:0.8rem;font-weight:700;text-decoration:none;">Facebook</a><a href="https://www.instagram.com/ecole_jamondeyra_bilingue/" target="_blank" style="background:var(--hand-pink);color:white;padding:6px 14px;border-radius:8px;font-size:0.8rem;font-weight:700;text-decoration:none;">Instagram</a></div></div></div>
       </div>
       <div class="contact-form">
         <h3>💬 Envoyer un message</h3>
@@ -693,14 +693,21 @@
     </div>
     <div class="admin-section" id="tab-settings">
       <div class="admin-card">
-        <h3>⚙️ Paramètres du site</h3>
-        <div class="admin-form-group"><label>Nom de l'école</label><input type="text" id="settingName" value="École Jamondeyra"></div>
-        <div class="admin-form-group"><label>Email de contact</label><input type="email" id="settingEmail" value="contact@ecolejamondeyra.fr"></div>
-        <div class="admin-form-group"><label>Téléphone</label><input type="text" id="settingPhone" placeholder="01 XX XX XX XX"></div>
+        <h3>📬 Infos de contact</h3>
+        <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1.2rem;">Ces informations s'affichent dans la section Contact du site.</p>
+        <div class="admin-form-group"><label>Adresse</label><textarea id="settingAddress" rows="2" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:0.9rem;outline:none;resize:vertical;">Parc du château de l'Hermitage&#10;Pontoise – Ennery, Val-d'Oise</textarea></div>
+        <div class="admin-form-row">
+          <div class="admin-form-group"><label>Téléphone</label><input type="text" id="settingPhone" placeholder="01 XX XX XX XX"></div>
+          <div class="admin-form-group"><label>Email de contact</label><input type="email" id="settingEmail" value="contact@ecolejamondeyra.fr"></div>
+        </div>
+        <div class="admin-form-group"><label>Horaires</label><textarea id="settingHours" rows="2" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:0.9rem;outline:none;resize:vertical;">Lun–Ven : 8h20 – 17h00&#10;Garderie : 7h30–8h20 / 17h–19h</textarea></div>
         <div class="admin-form-row">
           <div class="admin-form-group"><label>Facebook</label><input type="url" id="settingFb"></div>
           <div class="admin-form-group"><label>Instagram</label><input type="url" id="settingIg"></div>
         </div>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:1.5rem 0;">
+        <h3>⚙️ Paramètres du site</h3>
+        <div class="admin-form-group"><label>Nom de l'école</label><input type="text" id="settingName" value="École Jamondeyra"></div>
         <div class="admin-form-group"><label>Nouveau mot de passe admin</label><input type="password" id="settingPwd" placeholder="Laisser vide pour ne pas changer"></div>
         <button class="btn-save" onclick="saveSettings()">💾 Enregistrer</button>
       </div>
@@ -750,7 +757,7 @@ let services=load(STORAGE.services,defaultServices);
 let gallery=load(STORAGE.gallery,defaultGallery);
 let temoignages=load(STORAGE.temoignages,defaultTemoignages);
 let driveData=load(STORAGE.drive,defaultDrive);
-let settings=load(STORAGE.settings,{name:"École Jamondeyra",email:"contact@ecolejamondeyra.fr",phone:"",fb:"https://www.facebook.com/people/Ecole-Jamondeyra/100063759752377/",ig:"https://www.instagram.com/ecole_jamondeyra_bilingue/"});
+let settings=load(STORAGE.settings,{name:"École Jamondeyra",address:"Parc du château de l'Hermitage\nPontoise – Ennery, Val-d'Oise",email:"contact@ecolejamondeyra.fr",phone:"",hours:"Lun–Ven : 8h20 – 17h00\nGarderie : 7h30–8h20 / 17h–19h",fb:"https://www.facebook.com/people/Ecole-Jamondeyra/100063759752377/",ig:"https://www.instagram.com/ecole_jamondeyra_bilingue/"});
 let adminPwd=load(STORAGE.pwd,"admin123");
 
 function renderNews(){
@@ -773,7 +780,18 @@ function renderDrive(){
   if(driveData.link)btn.href=driveData.link;
   document.getElementById('driveCards').innerHTML=driveData.cards.map(c=>`<div class="drive-card"><div class="d-icon">${c.emoji}</div><h4>${c.title}</h4><p>${c.desc}</p></div>`).join('');
 }
-function renderAll(){renderNews();renderServices();renderGallery();renderTemoignages();renderDrive();}
+function renderContact(){
+  const toHtml=s=>(s||'').replace(/\n/g,'<br>');
+  const el=id=>document.getElementById(id);
+  if(el('contactAddress'))el('contactAddress').innerHTML=toHtml(settings.address)||'';
+  if(el('contactPhone'))el('contactPhone').textContent=settings.phone||'À compléter';
+  if(el('contactEmail'))el('contactEmail').textContent=settings.email||'';
+  if(el('contactHours'))el('contactHours').innerHTML=toHtml(settings.hours)||'';
+  if(el('contactSocial'))el('contactSocial').innerHTML=
+    (settings.fb?`<a href="${settings.fb}" target="_blank" style="background:var(--earth-blue);color:white;padding:6px 14px;border-radius:8px;font-size:0.8rem;font-weight:700;text-decoration:none;">Facebook</a>`:'')
+   +(settings.ig?`<a href="${settings.ig}" target="_blank" style="background:var(--hand-pink);color:white;padding:6px 14px;border-radius:8px;font-size:0.8rem;font-weight:700;text-decoration:none;">Instagram</a>`:'');
+}
+function renderAll(){renderNews();renderServices();renderGallery();renderTemoignages();renderDrive();renderContact();}
 
 function toggleNav(){document.getElementById('navLinks').classList.toggle('open');}
 
@@ -801,7 +819,7 @@ function renderAdminServices(){document.getElementById('adminServicesList').inne
 function renderAdminGallery(){document.getElementById('adminGalleryList').innerHTML=gallery.map(g=>`<div class="item-row"><div class="item-row-info"><h4>${g.emoji||'🖼️'} ${g.label}</h4><p>${g.url||'Emoji'}</p></div><div class="item-row-actions"><button class="btn-del" onclick="delGallery(${g.id})">🗑️</button></div></div>`).join('');}
 function renderAdminTemoignages(){document.getElementById('adminTemoignagesList').innerHTML=temoignages.map(t=>`<div class="item-row"><div class="item-row-info"><h4>${t.name}</h4><p>${t.text.substring(0,55)}…</p></div><div class="item-row-actions"><button class="btn-edit" onclick="editTemoignage(${t.id})">✏️</button><button class="btn-del" onclick="delTemoignage(${t.id})">🗑️</button></div></div>`).join('');}
 function renderAdminDrive(){document.getElementById('driveLinkInput').value=driveData.link||'';document.getElementById('adminDriveList').innerHTML=driveData.cards.map(c=>`<div class="item-row"><div class="item-row-info"><h4>${c.emoji} ${c.title}</h4><p>${c.desc}</p></div><div class="item-row-actions"><button class="btn-del" onclick="delDriveCard(${c.id})">🗑️</button></div></div>`).join('');}
-function renderAdminSettings(){document.getElementById('settingName').value=settings.name;document.getElementById('settingEmail').value=settings.email;document.getElementById('settingPhone').value=settings.phone||'';document.getElementById('settingFb').value=settings.fb;document.getElementById('settingIg').value=settings.ig;}
+function renderAdminSettings(){document.getElementById('settingName').value=settings.name||'';document.getElementById('settingAddress').value=settings.address||'';document.getElementById('settingEmail').value=settings.email||'';document.getElementById('settingPhone').value=settings.phone||'';document.getElementById('settingHours').value=settings.hours||'';document.getElementById('settingFb').value=settings.fb||'';document.getElementById('settingIg').value=settings.ig||'';}
 function renderAdminAll(){renderAdminNews();renderAdminServices();renderAdminGallery();renderAdminTemoignages();renderAdminDrive();renderAdminSettings();}
 
 let editModalSaveCallback=null;
@@ -831,7 +849,7 @@ function openAddDriveCard(){openEditModal('➕ Raccourci Drive',`<div class="adm
 function delDriveCard(id){driveData.cards=driveData.cards.filter(x=>x.id!==id);save(STORAGE.drive,driveData);renderDrive();renderAdminDrive();toast('Supprimé !');}
 function saveDrive(){driveData.link=document.getElementById('driveLinkInput').value;save(STORAGE.drive,driveData);renderDrive();toast('Drive enregistré !');}
 
-function saveSettings(){settings={name:v('settingName'),email:v('settingEmail'),phone:v('settingPhone'),fb:v('settingFb'),ig:v('settingIg')};save(STORAGE.settings,settings);const np=v('settingPwd');if(np){adminPwd=np;save(STORAGE.pwd,adminPwd);}toast('Paramètres enregistrés !');}
+function saveSettings(){settings={name:v('settingName'),address:v('settingAddress'),email:v('settingEmail'),phone:v('settingPhone'),hours:v('settingHours'),fb:v('settingFb'),ig:v('settingIg')};save(STORAGE.settings,settings);const np=v('settingPwd');if(np){adminPwd=np;save(STORAGE.pwd,adminPwd);}renderContact();toast('Paramètres enregistrés !');}
 function submitContact(){toast('Message envoyé ! Nous vous répondrons rapidement. 😊');}
 function v(id){const el=document.getElementById(id);return el?el.value:'';}
 function toast(msg){const t=document.getElementById('toast');t.textContent='✅ '+msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
