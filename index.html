@@ -436,7 +436,6 @@
     <a href="#services">Services</a>
     <a href="#galerie">Galerie</a>
     <a href="#temoignages">Témoignages</a>
-    <a href="#drive">Espace parents</a>
     <a href="#contact">Contact</a>
     <a href="#" onclick="openAdminLogin()" class="nav-admin-btn">🔑 Admin</a>
   </div>
@@ -558,16 +557,6 @@
 </section>
 
 <!-- ══ DRIVE ══ -->
-<section id="drive">
-  <div class="section-inner drive-inner">
-    <div class="section-tag" style="background:rgba(255,255,255,0.18);color:rgba(255,255,255,0.95);margin:0 auto 1rem;display:inline-flex;">📁 Espace parents</div>
-    <h2 class="section-title">Tous vos documents<br>en un clic</h2>
-    <p class="section-sub">Règlement, calendrier, menus, photos de classe… tout est centralisé dans votre espace Drive partagé.</p>
-    <div class="drive-cards" id="driveCards"></div>
-    <a id="driveLinkBtn" href="#" target="_blank" class="btn btn-drive">📂 Accéder à l'espace parents</a>
-  </div>
-</section>
-
 <!-- ══ CONTACT ══ -->
 <section id="contact">
   <div class="section-inner">
@@ -619,6 +608,7 @@
         <a href="#galerie">Galerie</a>
         <a href="#temoignages">Témoignages</a>
         <a href="#contact">Contact</a>
+        <a href="#" onclick="openParentSpace()">🔒 Espace parents</a>
       </div>
       <div>
         <h4>Légal</h4>
@@ -633,6 +623,27 @@
     </div>
   </div>
 </footer>
+
+<!-- ══ ESPACE PARENTS ══ -->
+<div class="modal-overlay" id="parentLoginModal" onclick="if(event.target===this)closeParentLogin()">
+  <div class="modal">
+    <button class="modal-close" onclick="closeParentLogin()">✕</button>
+    <h2 style="margin-bottom:0.4rem;">🔒 Espace parents</h2>
+    <p style="color:var(--muted);font-size:0.9rem;margin-bottom:1.2rem;">Entrez le mot de passe communiqué par l'école.</p>
+    <input type="password" id="parentPw" placeholder="Mot de passe" onkeydown="if(event.key==='Enter')doParentLogin()" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:12px 14px;font-family:'Nunito',sans-serif;font-size:0.95rem;outline:none;margin-bottom:0.5rem;">
+    <div id="parentLoginError" style="color:#c0392b;font-size:0.85rem;min-height:1.1rem;margin-bottom:0.5rem;"></div>
+    <button class="btn btn-primary" style="width:100%;" onclick="doParentLogin()">Se connecter</button>
+  </div>
+</div>
+<div class="modal-overlay" id="parentSpaceModal" onclick="if(event.target===this)closeParentSpace()">
+  <div class="modal" style="max-width:560px;max-height:85vh;overflow-y:auto;">
+    <button class="modal-close" onclick="closeParentSpace()">✕</button>
+    <h2 style="margin-bottom:0.3rem;">📨 Espace parents</h2>
+    <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1.2rem;">Informations réservées aux familles de l'école.</p>
+    <div id="parentSpaceBody"></div>
+    <button onclick="parentLogout()" style="width:100%;margin-top:1rem;padding:10px;border:2px solid #e5e7eb;border-radius:10px;background:#fff;color:var(--muted);font-family:'Nunito',sans-serif;font-weight:700;font-size:0.9rem;cursor:pointer;">Déconnexion</button>
+  </div>
+</div>
 
 <!-- ══ LOGIN MODAL ══ -->
 <div class="modal-overlay" id="loginModal">
@@ -877,7 +888,37 @@ function renderContact(){
     (s.fb&&s.fb.startsWith('https://')?`<a href="${s.fb}" target="_blank" class="social-btn">📘</a>`:'')+
     (s.ig&&s.ig.startsWith('https://')?`<a href="${s.ig}" target="_blank" class="social-btn">📸</a>`:'');
 }
-function renderAll(){renderNews();renderServices();renderGallery();renderTemoignages();renderDrive();renderContact();}
+function renderAll(){renderNews();renderServices();renderGallery();renderTemoignages();renderContact();}
+function openParentSpace(){
+  fetch('/api/parent/content').then(r=>{
+    if(r.status===401){openParentLogin();return null;}
+    if(!r.ok)return Promise.reject();
+    return r.json();
+  }).then(d=>{
+    if(!d)return;
+    renderParentSpace(Array.isArray(d.messages)?d.messages:[]);
+    document.getElementById('parentSpaceModal').classList.add('active');
+  }).catch(()=>toast('⚠️ Erreur de chargement'));
+}
+function openParentLogin(){document.getElementById('parentLoginError').textContent='';document.getElementById('parentPw').value='';document.getElementById('parentLoginModal').classList.add('active');setTimeout(()=>document.getElementById('parentPw').focus(),50);}
+function closeParentLogin(){document.getElementById('parentLoginModal').classList.remove('active');}
+function closeParentSpace(){document.getElementById('parentSpaceModal').classList.remove('active');}
+function doParentLogin(){
+  const pw=document.getElementById('parentPw').value;
+  const err=document.getElementById('parentLoginError');
+  err.textContent='';
+  if(!pw){err.textContent='Veuillez entrer le mot de passe.';return;}
+  fetch('/api/parent/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})}).then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{
+    if(ok){closeParentLogin();openParentSpace();}
+    else err.textContent=(d&&d.error)||'Mot de passe incorrect';
+  }).catch(()=>{err.textContent='Erreur réseau.';});
+}
+function parentLogout(){fetch('/api/parent/logout',{method:'POST'}).finally(()=>{closeParentSpace();toast('Déconnecté.');});}
+function renderParentSpace(messages){
+  const body=document.getElementById('parentSpaceBody');
+  if(!messages.length){body.innerHTML='<p style="color:var(--muted);text-align:center;padding:1rem;">Aucun message pour le moment.</p>';return;}
+  body.innerHTML=messages.map(m=>`<div style="background:#f8f6f0;border-radius:14px;padding:1rem 1.2rem;margin-bottom:0.9rem;text-align:left;">${m.cat?`<span class="news-tag" style="background:rgba(58,125,68,0.12);color:var(--green-dark);">${m.cat}</span>`:''}${m.date?`<div class="news-date" style="margin-top:0.3rem;">${m.date}</div>`:''}<h3 style="margin:0.3rem 0;overflow-wrap:break-word;word-break:break-word;">${m.title}</h3><p style="white-space:pre-wrap;overflow-wrap:break-word;word-break:break-word;color:var(--muted);line-height:1.6;margin:0;">${m.content}</p></div>`).join('');
+}
 
 function toggleNav(){document.getElementById('navLinks').classList.toggle('open');}
 
