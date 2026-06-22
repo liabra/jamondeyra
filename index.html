@@ -703,12 +703,15 @@
     </div>
     <div class="admin-section" id="tab-drive">
       <div class="admin-card">
-        <h3>📁 Espace parents – Drive</h3>
-        <div class="admin-form-group"><label>Lien Google Drive</label><input type="url" id="driveLinkInput" placeholder="https://drive.google.com/drive/folders/..."></div>
-        <h4 style="margin-bottom:1rem;font-size:0.9rem;">Raccourcis affichés</h4>
-        <button class="btn-add" onclick="openAddDriveCard()">+ Ajouter un raccourci</button>
-        <div class="items-list" id="adminDriveList"></div>
-        <button class="btn-save" onclick="saveDrive()">💾 Enregistrer</button>
+        <h3>🔒 Accès parents</h3>
+        <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1rem;">Mot de passe unique partagé avec les familles. <span id="parentPwStatus"></span></p>
+        <div class="admin-form-group"><label>Nouveau mot de passe parents (6 caractères min)</label><input type="text" id="parentPwInput" placeholder="ex. ecole2026"></div>
+        <button class="btn-save" onclick="setParentPassword()">🔑 Définir / changer le mot de passe</button>
+      </div>
+      <div class="admin-card">
+        <h3>📨 Messages aux parents</h3>
+        <button class="btn-add" onclick="openAddParentMsg()">+ Nouveau message</button>
+        <div class="items-list" id="adminParentList"></div>
       </div>
     </div>
     <div class="admin-section" id="tab-settings">
@@ -919,7 +922,7 @@ function switchTab(tab){
   else document.querySelectorAll('.admin-tab')[['news','services','gallery','temoignages','drive'].indexOf(tab)]?.classList.add('active');
   document.querySelectorAll('.admin-section').forEach(s=>s.classList.remove('active'));
   document.getElementById('tab-'+tab).classList.add('active');
-  if(tab==='comptes')renderAdminUsers();
+  if(tab==='comptes')renderAdminUsers();if(tab==='drive')loadParentAdmin();
 }
 
 function renderAdminNews(){document.getElementById('adminNewsList').innerHTML=news.map(n=>`<div class="item-row"><div class="item-row-info"><h4>${n.emoji} ${n.title}</h4><p>${n.date} · ${n.cat}</p></div><div class="item-row-actions"><button class="btn-edit" onclick="editNews(${n.id})">✏️</button><button class="btn-del" onclick="delNews(${n.id})">🗑️</button></div></div>`).join('')||'<p style="color:var(--muted);font-size:0.85rem;">Aucune actualité.</p>';}
@@ -938,7 +941,7 @@ function renderAdminSettings(){
   f('settingMapsUrl',s.mapsUrl);
   f('settingFb',s.fb);f('settingIg',s.ig);
 }
-function renderAdminAll(){renderAdminNews();renderAdminServices();renderAdminGallery();renderAdminTemoignages();renderAdminDrive();if(currentUser.role==='super_admin')renderAdminSettings();}
+function renderAdminAll(){renderAdminNews();renderAdminServices();renderAdminGallery();renderAdminTemoignages();if(currentUser.role==='super_admin')renderAdminSettings();}
 
 async function renderAdminUsers(){
   const r=await fetch('/api/users').catch(()=>null);
@@ -1000,6 +1003,28 @@ function driveCardForm(c={}){const s="width:100%;border:2px solid #e5e7eb;border
 function openAddDriveCard(){openEditModal('➕ Raccourci Drive',driveCardForm(),()=>{driveData.cards.push({id:Date.now(),emoji:v('dc_emoji'),title:v('dc_title'),desc:v('dc_desc'),url:v('dc_url'),badge:v('dc_badge')});apiSave('drive',driveData);renderDrive();renderAdminDrive();closeEditModal();toast('Ajouté !');});}
 function editDriveCard(id){const c=driveData.cards.find(x=>x.id===id);openEditModal('✏️ Modifier le raccourci',driveCardForm(c),()=>{Object.assign(c,{emoji:v('dc_emoji'),title:v('dc_title'),desc:v('dc_desc'),url:v('dc_url'),badge:v('dc_badge')});apiSave('drive',driveData);renderDrive();renderAdminDrive();closeEditModal();toast('Modifié !');});}
 function delDriveCard(id){driveData.cards=driveData.cards.filter(x=>x.id!==id);apiSave('drive',driveData);renderDrive();renderAdminDrive();toast('Supprimé !');}
+let parentMessages=[];
+function loadParentAdmin(){
+  fetch('/api/parent/admin').then(r=>r.ok?r.json():Promise.reject()).then(d=>{
+    parentMessages=Array.isArray(d.messages)?d.messages:[];
+    document.getElementById('parentPwStatus').textContent=d.passwordSet?'✅ Un mot de passe est défini.':'⚠️ Aucun mot de passe défini pour l’instant.';
+    renderParentAdmin();
+  }).catch(()=>toast('⚠️ Erreur de chargement de l’espace parents'));
+}
+function renderParentAdmin(){document.getElementById('adminParentList').innerHTML=parentMessages.map(m=>`<div class="item-row"><div class="item-row-info"><h4>${m.title}</h4><p>${m.date||''}${m.cat?' · '+m.cat:''}</p></div><div class="item-row-actions"><button class="btn-edit" onclick="editParentMsg(${m.id})">✏️</button><button class="btn-del" onclick="delParentMsg(${m.id})">🗑️</button></div></div>`).join('')||'<p style="color:var(--muted);font-size:0.85rem;">Aucun message pour l’instant.</p>';}
+function saveParentMessages(){fetch('/api/parent/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:parentMessages})}).then(r=>{if(!r.ok)toast('⚠️ Erreur de sauvegarde');}).catch(()=>toast('⚠️ Erreur réseau'));}
+function setParentPassword(){const pw=v('parentPwInput');if(!pw||pw.length<6){toast('⚠️ 6 caractères minimum');return;}fetch('/api/parent/password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})}).then(r=>{if(r.ok){toast('Mot de passe parents enregistré !');document.getElementById('parentPwInput').value='';document.getElementById('parentPwStatus').textContent='✅ Un mot de passe est défini.';}else toast('⚠️ Erreur (réservé au super admin)');}).catch(()=>toast('⚠️ Erreur réseau'));}
+function parentMsgForm(m={}){
+  const cats=['Infos','Cantine','Vacances','Sorties','Annonce','Urgent'];
+  const cur=m.cat||'Infos';
+  const catList=cats.includes(cur)?cats:[cur,...cats];
+  const opts=catList.map(c=>`<option value="${c}"${c===cur?' selected':''}>${c}</option>`).join('');
+  const st="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:0.9rem;outline:none;";
+  return `<div class="admin-form-group"><label>Titre</label><input id="pm_title" value="${m.title||''}" style="${st}"></div><div class="admin-form-row"><div class="admin-form-group"><label>Date</label><input id="pm_date" value="${m.date||''}" placeholder="ex. 22 juin 2026" style="${st}"></div><div class="admin-form-group"><label>Catégorie</label><select id="pm_cat" style="${st}background:#fff;">${opts}</select></div></div><div class="admin-form-group"><label>Message</label><textarea id="pm_content" style="${st}min-height:120px;resize:vertical;">${m.content||''}</textarea></div>`;
+}
+function openAddParentMsg(){openEditModal('➕ Nouveau message',parentMsgForm(),()=>{parentMessages.unshift({id:Date.now(),title:v('pm_title'),date:v('pm_date'),cat:v('pm_cat'),content:v('pm_content')});saveParentMessages();renderParentAdmin();closeEditModal();toast('Message publié !');});}
+function editParentMsg(id){const m=parentMessages.find(x=>x.id===id);openEditModal('✏️ Modifier le message',parentMsgForm(m),()=>{Object.assign(m,{title:v('pm_title'),date:v('pm_date'),cat:v('pm_cat'),content:v('pm_content')});saveParentMessages();renderParentAdmin();closeEditModal();toast('Modifié !');});}
+function delParentMsg(id){if(!confirm('Supprimer ce message ?'))return;parentMessages=parentMessages.filter(x=>x.id!==id);saveParentMessages();renderParentAdmin();toast('Supprimé !');}
 function saveDrive(){driveData.link=document.getElementById('driveLinkInput').value;apiSave('drive',driveData);renderDrive();toast('Drive enregistré !');}
 
 async function saveSettings(){
