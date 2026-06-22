@@ -76,10 +76,14 @@ app.disable('x-powered-by');
 if (isProd) {
   app.use((req, res, next) => {
     const origin = req.headers.origin;
-    // Requêtes same-origin n'ont pas d'header Origin — on les laisse passer
+    // Pas de header Origin (cas fréquent en GET same-origin) — on laisse passer
     if (!origin) return next();
-    // En prod, rejeter toute requête cross-origin vers les API
-    if (req.path.startsWith('/api/')) {
+    // Les navigateurs envoient un header Origin sur les requêtes POST/PUT/DELETE
+    // même en same-origin. On compare donc l'origine à l'hôte de la requête et
+    // on ne bloque que les requêtes réellement cross-origin vers les API.
+    const host = req.headers.host;
+    const sameOrigin = origin === `https://${host}` || origin === `http://${host}`;
+    if (!sameOrigin && req.path.startsWith('/api/')) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
     next();
