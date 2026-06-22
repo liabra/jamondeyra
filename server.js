@@ -31,7 +31,7 @@ if (!fs.existsSync(DATA_FILE)) {
   fs.writeFileSync(DATA_FILE, '{}');
 }
 
-const CONTENT_KEYS  = new Set(['news', 'services', 'gallery', 'temoignages', 'drive']);
+const CONTENT_KEYS  = new Set(['news', 'services', 'gallery', 'temoignages']);
 const SETTINGS_KEYS = new Set(['settings']);
 const ALL_KEYS      = new Set([...CONTENT_KEYS, ...SETTINGS_KEYS]);
 
@@ -486,7 +486,10 @@ app.post('/api/parent/logout', (req, res) => {
 // Contenu réservé aux parents authentifiés
 app.get('/api/parent/content', requireParent, (req, res) => {
   const content = readJSON(DATA_FILE, {});
-  res.json({ messages: Array.isArray(content.parentMessages) ? content.parentMessages : [] });
+  res.json({
+    messages: Array.isArray(content.parentMessages) ? content.parentMessages : [],
+    drive: content.parentDrive || null,
+  });
 });
 
 // Lecture admin : messages + état du mot de passe
@@ -495,6 +498,7 @@ app.get('/api/parent/admin', requireAuth, (req, res) => {
   res.json({
     messages: Array.isArray(content.parentMessages) ? content.parentMessages : [],
     passwordSet: !!(content.parentAuth && content.parentAuth.hash),
+    drive: content.parentDrive || null,
   });
 });
 
@@ -522,6 +526,33 @@ app.post('/api/parent/messages', requireAuth, (req, res) => {
   content.parentMessages = messages;
   writeJSON(DATA_FILE, content);
   log('info', 'parent_messages_saved', { by: req.admin.username, count: messages.length });
+  res.json({ ok: true });
+});
+
+function validParentDrive(d) {
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return false;
+  if (d.link !== undefined && (typeof d.link !== 'string' || d.link.length > 500)) return false;
+  if (!Array.isArray(d.cards) || d.cards.length > 30) return false;
+  return d.cards.every(c =>
+    c && typeof c === 'object' && !Array.isArray(c)
+    && typeof c.title === 'string' && c.title.length <= 120
+    && (c.emoji === undefined || (typeof c.emoji === 'string' && c.emoji.length <= 12))
+    && (c.desc  === undefined || (typeof c.desc  === 'string' && c.desc.length  <= 200))
+    && (c.url   === undefined || (typeof c.url   === 'string' && c.url.length   <= 500))
+    && (c.badge === undefined || (typeof c.badge === 'string' && c.badge.length <= 40))
+  );
+}
+
+// Enregistrer les raccourcis Drive parents
+app.post('/api/parent/drive', requireAuth, (req, res) => {
+  const { drive } = req.body || {};
+  if (!validParentDrive(drive)) {
+    return res.status(400).json({ error: 'Données invalides' });
+  }
+  const content = readJSON(DATA_FILE, {});
+  content.parentDrive = drive;
+  writeJSON(DATA_FILE, content);
+  log('info', 'parent_drive_saved', { by: req.admin.username, count: drive.cards.length });
   res.json({ ok: true });
 });
 

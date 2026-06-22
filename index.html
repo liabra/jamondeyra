@@ -724,6 +724,14 @@
         <button class="btn-add" onclick="openAddParentMsg()">+ Nouveau message</button>
         <div class="items-list" id="adminParentList"></div>
       </div>
+      <div class="admin-card">
+        <h3>📁 Documents & raccourcis</h3>
+        <div class="admin-form-group"><label>Lien du Drive partagé <span style="font-weight:400;color:var(--muted)">(optionnel)</span></label><input type="url" id="parentDriveLink" placeholder="https://drive.google.com/drive/folders/..."></div>
+        <h4 style="margin-bottom:1rem;font-size:0.9rem;">Raccourcis affichés aux parents</h4>
+        <button class="btn-add" onclick="openAddDriveCard()">+ Ajouter un raccourci</button>
+        <div class="items-list" id="adminParentDriveList"></div>
+        <button class="btn-save" onclick="saveParentDrive()">💾 Enregistrer les documents</button>
+      </div>
     </div>
     <div class="admin-section" id="tab-settings">
       <div class="admin-card">
@@ -896,7 +904,7 @@ function openParentSpace(){
     return r.json();
   }).then(d=>{
     if(!d)return;
-    renderParentSpace(Array.isArray(d.messages)?d.messages:[]);
+    renderParentSpace(d);
     document.getElementById('parentSpaceModal').classList.add('active');
   }).catch(()=>toast('⚠️ Erreur de chargement'));
 }
@@ -914,10 +922,30 @@ function doParentLogin(){
   }).catch(()=>{err.textContent='Erreur réseau.';});
 }
 function parentLogout(){fetch('/api/parent/logout',{method:'POST'}).finally(()=>{closeParentSpace();toast('Déconnecté.');});}
-function renderParentSpace(messages){
-  const body=document.getElementById('parentSpaceBody');
-  if(!messages.length){body.innerHTML='<p style="color:var(--muted);text-align:center;padding:1rem;">Aucun message pour le moment.</p>';return;}
-  body.innerHTML=messages.map(m=>`<div style="background:#f8f6f0;border-radius:14px;padding:1rem 1.2rem;margin-bottom:0.9rem;text-align:left;">${m.cat?`<span class="news-tag" style="background:rgba(58,125,68,0.12);color:var(--green-dark);">${m.cat}</span>`:''}${m.date?`<div class="news-date" style="margin-top:0.3rem;">${m.date}</div>`:''}<h3 style="margin:0.3rem 0;overflow-wrap:break-word;word-break:break-word;">${m.title}</h3><p style="white-space:pre-wrap;overflow-wrap:break-word;word-break:break-word;color:var(--muted);line-height:1.6;margin:0;">${m.content}</p></div>`).join('');
+function renderParentSpace(d){
+  const drive=d.drive||{link:'',cards:[]};
+  const messages=Array.isArray(d.messages)?d.messages:[];
+  let html='';
+  if(drive.cards&&drive.cards.length){
+    html+='<h3 style="font-size:1rem;margin-bottom:0.6rem;">📁 Documents</h3><div style="display:flex;flex-wrap:wrap;gap:0.6rem;margin-bottom:1.2rem;">';
+    html+=drive.cards.map(c=>{
+      const hasUrl=c.url&&c.url.startsWith('https://');
+      const tag=hasUrl?'a':'div';
+      const attrs=hasUrl?` href="${c.url}" target="_blank" rel="noopener"`:'';
+      return `<${tag}${attrs} style="flex:1 1 130px;min-width:130px;background:#f8f6f0;border-radius:12px;padding:0.8rem;text-align:center;text-decoration:none;color:inherit;position:relative;${hasUrl?'cursor:pointer;':''}">${c.badge?`<span style="position:absolute;top:6px;right:6px;background:var(--orange-warm);color:#fff;font-size:0.6rem;font-weight:800;padding:1px 6px;border-radius:50px;">${c.badge}</span>`:''}<div style="font-size:1.8rem;margin-bottom:0.3rem;">${c.emoji||'📄'}</div><div style="font-weight:800;font-size:0.85rem;">${c.title}</div><div style="font-size:0.72rem;color:var(--muted);">${c.desc||''}</div></${tag}>`;
+    }).join('');
+    html+='</div>';
+    if(drive.link&&drive.link.startsWith('https://')){
+      html+=`<a href="${drive.link}" target="_blank" rel="noopener" class="btn btn-primary" style="width:100%;margin-bottom:1.2rem;display:block;text-align:center;text-decoration:none;">📂 Ouvrir le Drive partagé</a>`;
+    }
+  }
+  html+='<h3 style="font-size:1rem;margin-bottom:0.6rem;">📨 Messages</h3>';
+  if(messages.length){
+    html+=messages.map(m=>`<div style="background:#f8f6f0;border-radius:14px;padding:1rem 1.2rem;margin-bottom:0.9rem;text-align:left;">${m.cat?`<span class="news-tag" style="background:rgba(58,125,68,0.12);color:var(--green-dark);">${m.cat}</span>`:''}${m.date?`<div class="news-date" style="margin-top:0.3rem;">${m.date}</div>`:''}<h3 style="margin:0.3rem 0;overflow-wrap:break-word;word-break:break-word;">${m.title}</h3><p style="white-space:pre-wrap;overflow-wrap:break-word;word-break:break-word;color:var(--muted);line-height:1.6;margin:0;">${m.content}</p></div>`).join('');
+  }else{
+    html+='<p style="color:var(--muted);text-align:center;padding:0.5rem;">Aucun message pour le moment.</p>';
+  }
+  document.getElementById('parentSpaceBody').innerHTML=html;
 }
 
 function toggleNav(){document.getElementById('navLinks').classList.toggle('open');}
@@ -1041,15 +1069,20 @@ function editTemoignage(id){const t=temoignages.find(x=>x.id===id);openEditModal
 function delTemoignage(id){if(!confirm('Supprimer ?'))return;temoignages=temoignages.filter(x=>x.id!==id);apiSave('temoignages',temoignages);renderTemoignages();renderAdminTemoignages();toast('Supprimé !');}
 
 function driveCardForm(c={}){const s="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;font-size:0.9rem;";return `<div class="admin-form-row"><div class="admin-form-group"><label>Emoji</label><input id="dc_emoji" value="${c.emoji||''}" placeholder="📄" style="${s}"></div><div class="admin-form-group"><label>Titre</label><input id="dc_title" value="${c.title||''}" placeholder="Calendrier" style="${s}"></div></div><div class="admin-form-group"><label>Description courte</label><input id="dc_desc" value="${c.desc||''}" placeholder="PDF disponible" style="${s}"></div><div class="admin-form-group"><label>Lien direct <span style="font-weight:400;color:var(--muted)">(optionnel — ouvre ce document spécifique)</span></label><input type="url" id="dc_url" value="${c.url||''}" placeholder="https://drive.google.com/..." style="${s}"></div><div class="admin-form-group"><label>Badge <span style="font-weight:400;color:var(--muted)">(optionnel — ex: Nouveau, MàJ)</span></label><input id="dc_badge" value="${c.badge||''}" placeholder="Nouveau" style="${s}"></div>`;}
-function openAddDriveCard(){openEditModal('➕ Raccourci Drive',driveCardForm(),()=>{driveData.cards.push({id:Date.now(),emoji:v('dc_emoji'),title:v('dc_title'),desc:v('dc_desc'),url:v('dc_url'),badge:v('dc_badge')});apiSave('drive',driveData);renderDrive();renderAdminDrive();closeEditModal();toast('Ajouté !');});}
-function editDriveCard(id){const c=driveData.cards.find(x=>x.id===id);openEditModal('✏️ Modifier le raccourci',driveCardForm(c),()=>{Object.assign(c,{emoji:v('dc_emoji'),title:v('dc_title'),desc:v('dc_desc'),url:v('dc_url'),badge:v('dc_badge')});apiSave('drive',driveData);renderDrive();renderAdminDrive();closeEditModal();toast('Modifié !');});}
-function delDriveCard(id){driveData.cards=driveData.cards.filter(x=>x.id!==id);apiSave('drive',driveData);renderDrive();renderAdminDrive();toast('Supprimé !');}
+function renderParentDriveAdmin(){document.getElementById('adminParentDriveList').innerHTML=driveData.cards.map(c=>`<div class="item-row"><div class="item-row-info"><h4>${c.emoji||'📄'} ${c.title}${c.badge?` <span style="background:var(--orange-warm);color:#fff;font-size:0.65rem;font-weight:800;padding:1px 6px;border-radius:50px;vertical-align:middle;">${c.badge}</span>`:''}</h4><p>${c.desc||''}${c.url?' · 🔗 lien direct':''}</p></div><div class="item-row-actions"><button class="btn-edit" onclick="editDriveCard(${c.id})">✏️</button><button class="btn-del" onclick="delDriveCard(${c.id})">🗑️</button></div></div>`).join('')||'<p style="color:var(--muted);font-size:0.85rem;">Aucun raccourci.</p>';}
+function saveParentDrive(){driveData.link=v('parentDriveLink')||'';fetch('/api/parent/drive',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({drive:driveData})}).then(r=>{if(r.ok)toast('Documents enregistrés !');else toast('⚠️ Erreur de sauvegarde');}).catch(()=>toast('⚠️ Erreur réseau'));}
+function openAddDriveCard(){openEditModal('➕ Raccourci',driveCardForm(),()=>{driveData.cards.push({id:Date.now(),emoji:v('dc_emoji'),title:v('dc_title'),desc:v('dc_desc'),url:v('dc_url'),badge:v('dc_badge')});saveParentDrive();renderParentDriveAdmin();closeEditModal();toast('Ajouté !');});}
+function editDriveCard(id){const c=driveData.cards.find(x=>x.id===id);openEditModal('✏️ Modifier le raccourci',driveCardForm(c),()=>{Object.assign(c,{emoji:v('dc_emoji'),title:v('dc_title'),desc:v('dc_desc'),url:v('dc_url'),badge:v('dc_badge')});saveParentDrive();renderParentDriveAdmin();closeEditModal();toast('Modifié !');});}
+function delDriveCard(id){if(!confirm('Supprimer ce raccourci ?'))return;driveData.cards=driveData.cards.filter(x=>x.id!==id);saveParentDrive();renderParentDriveAdmin();toast('Supprimé !');}
 let parentMessages=[];
 function loadParentAdmin(){
   fetch('/api/parent/admin').then(r=>r.ok?r.json():Promise.reject()).then(d=>{
     parentMessages=Array.isArray(d.messages)?d.messages:[];
     document.getElementById('parentPwStatus').textContent=d.passwordSet?'✅ Un mot de passe est défini.':'⚠️ Aucun mot de passe défini pour l’instant.';
+    if(d.drive&&Array.isArray(d.drive.cards)){driveData=d.drive;}
+    document.getElementById('parentDriveLink').value=driveData.link||'';
     renderParentAdmin();
+    renderParentDriveAdmin();
   }).catch(()=>toast('⚠️ Erreur de chargement de l’espace parents'));
 }
 function renderParentAdmin(){document.getElementById('adminParentList').innerHTML=parentMessages.map(m=>`<div class="item-row"><div class="item-row-info"><h4>${m.title}</h4><p>${m.date||''}${m.cat?' · '+m.cat:''}</p></div><div class="item-row-actions"><button class="btn-edit" onclick="editParentMsg(${m.id})">✏️</button><button class="btn-del" onclick="delParentMsg(${m.id})">🗑️</button></div></div>`).join('')||'<p style="color:var(--muted);font-size:0.85rem;">Aucun message pour l’instant.</p>';}
