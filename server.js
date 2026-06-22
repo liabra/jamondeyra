@@ -18,6 +18,7 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
 }
 
 const app    = express();
+app.set('trust proxy', 1); // Railway place l'app derrière un proxy
 const PORT   = process.env.PORT || 3000;
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -122,14 +123,19 @@ app.use('/api/', apiLimiter);
 // 4. Bloquer l'accès direct aux fichiers data/ via static
 app.use('/data', (req, res) => res.status(404).end());
 
+// Bloquer l'accès public au code serveur, à la configuration et aux données
+app.use((req, res, next) => {
+  const p = req.path;
+  if (p === '/server.js' || p === '/package.json' || p === '/package-lock.json'
+   || p.startsWith('/scripts/') || p.startsWith('/data/')) {
+    return res.status(404).end();
+  }
+  next();
+});
+
 app.use(express.static(__dirname, {
   index: 'index.html',
-  // Exclure explicitement les fichiers sensibles
-  setHeaders: (res, filePath) => {
-    if (filePath.startsWith(DATA_DIR)) {
-      res.status(404).end();
-    }
-  },
+  dotfiles: 'ignore',
 }));
 
 // ── Helpers fichiers ─────────────────────────────────────────────────────────
