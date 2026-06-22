@@ -307,23 +307,32 @@ app.post('/api/save', requireAuth, (req, res) => {
 });
 
 app.post('/api/change-password', requireAuth, async (req, res) => {
-  const { newPassword } = req.body || {};
+  const { currentPassword, newPassword } = req.body || {};
 
   if (!newPassword || typeof newPassword !== 'string'
    || newPassword.length < 8 || newPassword.length > 128) {
     return res.status(400).json({ error: 'Mot de passe trop court (8 caractères minimum)' });
   }
 
+  if (!currentPassword || typeof currentPassword !== 'string' || currentPassword.length > 128) {
+    return res.status(400).json({ error: 'Mot de passe actuel requis' });
+  }
+
   if (req.admin.username === 'admin') {
     return res.status(403).json({ error: 'Utilisez la variable d\'environnement ADMIN_PASSWORD_HASH pour ce compte' });
   }
 
-  const hash  = await bcrypt.hash(newPassword, 12);
   const users = getUsers();
   const user  = users.find(u => u.username === req.admin.username);
   if (!user) return res.status(404).json({ error: 'Compte introuvable' });
 
-  user.hash = hash;
+  const valid = await bcrypt.compare(currentPassword, user.hash);
+  if (!valid) {
+    log('warn', 'password_change_wrong_current', { username: req.admin.username });
+    return res.status(401).json({ error: 'Mot de passe actuel incorrect' });
+  }
+
+  user.hash = await bcrypt.hash(newPassword, 12);
   saveUsers(users);
 
   log('info', 'password_changed', { username: req.admin.username });

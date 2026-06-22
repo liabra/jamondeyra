@@ -766,6 +766,7 @@
 
         <hr style="border:none;border-top:1px solid #e5e7eb;margin:1.5rem 0;">
         <h3>🔒 Sécurité</h3>
+        <div class="admin-form-group"><label>Mot de passe actuel <span style="font-weight:400;color:var(--muted)">(requis pour changer)</span></label><input type="password" id="settingCurrentPwd" placeholder="Votre mot de passe actuel"></div>
         <div class="admin-form-group"><label>Nouveau mot de passe <span style="font-weight:400;color:var(--muted)">(laisser vide pour ne pas changer)</span></label><input type="password" id="settingPwd" placeholder="8 caractères minimum"></div>
         <button class="btn-save" onclick="saveSettings()">💾 Enregistrer</button>
       </div>
@@ -1109,9 +1110,12 @@ async function saveSettings(){
   const np=v('settingPwd');
   if(np){
     if(np.length<8){toast('⚠️ Mot de passe trop court (8 caractères min)');return;}
-    const r=await fetch('/api/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({newPassword:np})});
+    const cp=v('settingCurrentPwd');
+    if(!cp){toast('⚠️ Entrez votre mot de passe actuel');return;}
+    const r=await fetch('/api/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({currentPassword:cp,newPassword:np})});
     if(!r.ok){const e=await r.json();toast('⚠️ '+(e.error||'Erreur'));return;}
     document.getElementById('settingPwd').value='';
+    document.getElementById('settingCurrentPwd').value='';
     toast('Mot de passe mis à jour. Reconnectez-vous.');
     setTimeout(()=>logout(),1500);
     return;
