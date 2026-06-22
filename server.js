@@ -411,6 +411,120 @@ app.post('/api/users/:username/password', requireAuth, requireSuperAdmin, async 
   res.json({ ok: true });
 });
 
+// ── Espace parents ────────────────────────────────────────────────────────────
+
+const parentLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    log('warn', 'parent_login_rate_limited', { ip: req.ip });
+    res.status(429).json({ error: 'Trop de tentatives. Réessayez dans 15 minutes.' });
+  },
+});
+
+function requireParent(req, res, next) {
+  const token = req.cookies.jey_parent;
+  if (!token) return res.status(401).json({ error: 'Non autorisé' });
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== 'parent') throw new Error('bad role');
+    req.parent = decoded;
+    next();
+  } catch {
+    res.clearCookie('jey_parent', { path: '/' });
+    return res.status(401).json({ error: 'Session expirée' });
+  }
+}
+
+function validParentMessages(d) {
+  return Array.isArray(d) && d.length <= 100 && d.every(m =>
+    m && typeof m === 'object' && !Array.isArray(m)
+    && typeof m.title === 'string'   && m.title.length   <= 200
+    && typeof m.content === 'string' && m.content.length <= 5000
+    && (m.date === undefined || (typeof m.date === 'string' && m.date.length <= 40))
+    && (m.cat  === undefined || (typeof m.cat  === 'string' && m.cat.length  <= 40))
+  );
+}
+
+// Connexion parents (mot de passe partagé)
+app.post('/api/parent/login', parentLoginLimiter, async (req, res) => {
+  const { password } = req.body || {};
+  const ip = req.ip;
+  if (!password || typeof password !== 'string' || password.length > 128) {
+    return res.status(400).json({ error: 'Mot de passe invalide' });
+  }
+  const content = readJSON(DATA_FILE, {});
+  const hash = content.parentAuth && content.parentAuth.hash;
+  if (!hash) {
+    return res.status(503).json({ error: "L'espace parents n'est pas encore configuré." });
+  }
+  const valid = await bcrypt.compare(password, hash);
+  if (!valid) {
+    log('warn', 'parent_login_failed', { ip });
+    return res.status(401).json({ error: 'Mot de passe incorrect' });
+  }
+  const token = jwt.sign({ role: 'parent' }, process.env.JWT_SECRET, { expiresIn: '8h' });
+  res.cookie('jey_parent', token, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: 'strict',
+    maxAge: 8 * 60 * 60 * 1000,
+    path: '/',
+  });
+  log('info', 'parent_login_success', { ip });
+  res.json({ ok: true });
+});
+
+app.post('/api/parent/logout', (req, res) => {
+  res.clearCookie('jey_parent', { path: '/' });
+  res.json({ ok: true });
+});
+
+// Contenu réservé aux parents authentifiés
+app.get('/api/parent/content', requireParent, (req, res) => {
+  const content = readJSON(DATA_FILE, {});
+  res.json({ messages: Array.isArray(content.parentMessages) ? content.parentMessages : [] });
+});
+
+// Lecture admin : messages + état du mot de passe
+app.get('/api/parent/admin', requireAuth, (req, res) => {
+  const content = readJSON(DATA_FILE, {});
+  res.json({
+    messages: Array.isArray(content.parentMessages) ? content.parentMessages : [],
+    passwordSet: !!(content.parentAuth && content.parentAuth.hash),
+  });
+});
+
+// Définir / changer le mot de passe parents (super admin uniquement)
+app.post('/api/parent/password', requireAuth, requireSuperAdmin, async (req, res) => {
+  const { password } = req.body || {};
+  if (!password || typeof password !== 'string' || password.length < 6 || password.length > 128) {
+    return res.status(400).json({ error: 'Mot de passe trop court (6 caractères min).' });
+  }
+  const hash = await bcrypt.hash(password, 12);
+  const content = readJSON(DATA_FILE, {});
+  content.parentAuth = { hash };
+  writeJSON(DATA_FILE, content);
+  log('info', 'parent_password_set', { by: req.admin.username });
+  res.json({ ok: true });
+});
+
+// Enregistrer les messages parents
+app.post('/api/parent/messages', requireAuth, (req, res) => {
+  const { messages } = req.body || {};
+  if (!validParentMessages(messages)) {
+    return res.status(400).json({ error: 'Données invalides' });
+  }
+  const content = readJSON(DATA_FILE, {});
+  content.parentMessages = messages;
+  writeJSON(DATA_FILE, content);
+  log('info', 'parent_messages_saved', { by: req.admin.username, count: messages.length });
+  res.json({ ok: true });
+});
+
 // ── Erreurs non gérées ────────────────────────────────────────────────────────
 
 // Réponse sobre pour toute route inconnue sous /api/
