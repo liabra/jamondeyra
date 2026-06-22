@@ -21,9 +21,15 @@ const app    = express();
 const PORT   = process.env.PORT || 3000;
 const isProd = process.env.NODE_ENV === 'production';
 
-const DATA_FILE  = path.join(__dirname, 'data', 'content.json');
-const USERS_FILE = path.join(__dirname, 'data', 'users.json');
-const DATA_DIR   = path.join(__dirname, 'data');
+const DATA_DIR   = process.env.DATA_DIR || path.join(__dirname, 'data');
+const DATA_FILE  = path.join(DATA_DIR, 'content.json');
+const USERS_FILE = path.join(DATA_DIR, 'users.json');
+
+// Initialisation du dossier de données (volume persistant Railway le cas échéant)
+fs.mkdirSync(DATA_DIR, { recursive: true });
+if (!fs.existsSync(DATA_FILE)) {
+  fs.writeFileSync(DATA_FILE, '{}');
+}
 
 const CONTENT_KEYS  = new Set(['news', 'services', 'gallery', 'temoignages', 'drive']);
 const SETTINGS_KEYS = new Set(['settings']);
@@ -50,6 +56,7 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc:  ["'self'", "'unsafe-inline'"],   // inline scripts du HTML existant
+      scriptSrcAttr: ["'unsafe-inline'"],          // gestionnaires d'événements en ligne (onclick…)
       styleSrc:   ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       fontSrc:    ["'self'", 'https://fonts.gstatic.com'],
       imgSrc:     ["'self'", 'data:', 'https:'],
