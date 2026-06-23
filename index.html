@@ -425,9 +425,13 @@
     /* Services : 2 colonnes compactes, comme la galerie */
     .services-grid { grid-template-columns:repeat(2,1fr); gap:0.7rem; }
     .service-card { padding:1.2rem 0.8rem; }
-    /* Actualités : 1 colonne mais plus compacte (image plus basse, moins de marges) */
-    .news-card-img { height:140px; font-size:3rem; }
-    .news-card-body { padding:1.1rem; }
+    /* Actualités : 2 colonnes compactes */
+    .news-grid { grid-template-columns:repeat(2,1fr); gap:0.7rem; }
+    .news-card-img { height:100px; font-size:2.4rem; }
+    .news-card-body { padding:0.8rem; }
+    .news-card h3 { font-size:0.95rem; }
+    .news-card p { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+    .read-more { font-size:0.75rem !important; }
     /* Témoignages : 1 colonne, moins de marges */
     .temoignage-card { padding:1.3rem; }
   }
@@ -838,7 +842,14 @@ let settings={name:"École Jamondeyra",address1:"Parc du château de l'Hermitage
 function renderNews(){
   const g=document.getElementById('newsGrid');
   if(!news.length){g.innerHTML='<p style="color:var(--muted)">Aucune actualité.</p>';return;}
-  g.innerHTML=news.map(n=>`<div class="news-card" style="cursor:pointer;" onclick="openArticle(${n.id})"><div class="news-card-img" style="background:${n.color}18;">${n.emoji}</div><div class="news-card-body"><span class="news-tag" style="background:${n.color}18;color:${n.color};">${n.cat}</span><div class="news-date">${n.date}</div><h3>${n.title}</h3><p>${n.content}</p></div></div>`).join('');
+  const LIMIT=110;
+  g.innerHTML=news.map(n=>{
+    const full=n.content||'';
+    const long=full.length>LIMIT;
+    const preview=long?full.slice(0,LIMIT).replace(/\s+/g,' ').trim()+'…':full;
+    const more=long?`<span class="read-more" style="color:${n.color};font-weight:800;font-size:0.82rem;display:inline-block;margin-top:0.5rem;">Lire la suite →</span>`:'';
+    return `<div class="news-card" style="cursor:pointer;" onclick="openArticle(${n.id})"><div class="news-card-img" style="background:${n.color}18;">${n.emoji}</div><div class="news-card-body"><span class="news-tag" style="background:${n.color}18;color:${n.color};">${n.cat}</span><div class="news-date">${n.date}</div><h3>${n.title}</h3><p>${preview}</p>${more}</div></div>`;
+  }).join('');
 }
 function renderServices(){
   const classes=['sc1','sc2','sc3','sc4','sc5','sc6'];
