@@ -208,6 +208,7 @@
   }
   .news-card:hover { transform:translateY(-6px); box-shadow:0 20px 50px rgba(0,0,0,0.12); }
   .news-card-img { height:175px; display:flex; align-items:center; justify-content:center; font-size:4rem; }
+  .news-card-img img { width:100%; height:100%; object-fit:cover; display:block; }
   .news-card-body { padding:1.5rem; }
   .news-date { font-size:0.75rem; color:var(--muted); font-weight:600; margin-bottom:0.5rem; }
   .news-card h3 { font-size:1.1rem; font-weight:800; margin-bottom:0.5rem; line-height:1.3; overflow-wrap:break-word; word-break:break-word; }
@@ -342,6 +343,7 @@
   }
   @keyframes modalPop { from{opacity:0;transform:scale(0.8) translateY(40px);} to{opacity:1;transform:scale(1) translateY(0);} }
   .modal h2 { font-size:1.5rem; margin-bottom:0.5rem; }
+  .article-img { width:100%; max-height:320px; object-fit:cover; border-radius:var(--radius-sm); display:block; margin-bottom:1rem; }
   .modal p.modal-desc { color:var(--muted); font-size:0.9rem; margin-bottom:1.5rem; }
   .modal-close { position:absolute; top:1rem; right:1rem; background:var(--soft); border:none; border-radius:8px; width:32px; height:32px; cursor:pointer; font-size:1rem; display:flex; align-items:center; justify-content:center; }
   .modal-close:hover { background:#fee2e2; color:var(--orange); }
@@ -810,6 +812,22 @@
 
 <script>
 function apiSave(key,data){fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,data})}).then(r=>{if(!r.ok)toast('⚠️ Erreur de sauvegarde');}).catch(()=>toast('⚠️ Erreur réseau'));}
+async function uploadImage(file){
+  const fd=new FormData(); fd.append('image', file);
+  const r=await fetch('/api/upload',{method:'POST',body:fd}).catch(()=>null);
+  if(!r||!r.ok){const e=r?await r.json().catch(()=>({})):{};toast('⚠️ '+(e.error||'Erreur upload'));return null;}
+  const d=await r.json();
+  return d.url;
+}
+// Envoie le fichier choisi et remplit le champ URL associé (qui reste éditable)
+async function handleImageFile(input,urlFieldId){
+  const file=input.files&&input.files[0];if(!file)return;
+  const url=await uploadImage(file);
+  if(!url){input.value='';return;}
+  document.getElementById(urlFieldId).value=url;
+  toast('Image envoyée !');
+}
+function escAttr(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
 
 const defaultNews=[
   {id:1,title:"Kermesse de fin d'année 🎉",date:"15 juin 2025",cat:"Événement",emoji:"🎪",content:"Grande fête de fin d'année avec jeux, stands gourmands et spectacle des enfants. Toutes les familles sont invitées !",color:"#D4691E"},
@@ -857,7 +875,8 @@ function renderNews(){
     const long=full.length>LIMIT;
     const preview=long?full.slice(0,LIMIT).replace(/\s+/g,' ').trim()+'…':full;
     const more=long?`<span class="read-more" style="color:${n.color};font-weight:800;font-size:0.82rem;display:inline-block;margin-top:0.5rem;">Lire la suite →</span>`:'';
-    return `<div class="news-card" style="cursor:pointer;" onclick="openArticle(${n.id})"><div class="news-card-img" style="background:${n.color}18;">${n.emoji}</div><div class="news-card-body"><span class="news-tag" style="background:${n.color}18;color:${n.color};">${n.cat}</span><div class="news-date">${n.date}</div><h3>${n.title}</h3><p>${preview}</p>${more}</div></div>`;
+    const visual=n.image?`<img src="${escAttr(n.image)}" alt="" loading="lazy" onerror="this.nextElementSibling.hidden=false;this.remove();"><span hidden>${n.emoji}</span>`:n.emoji;
+    return `<div class="news-card" style="cursor:pointer;" onclick="openArticle(${n.id})"><div class="news-card-img" style="background:${n.color}18;">${visual}</div><div class="news-card-body"><span class="news-tag" style="background:${n.color}18;color:${n.color};">${n.cat}</span><div class="news-date">${n.date}</div><h3>${n.title}</h3><p>${preview}</p>${more}</div></div>`;
   }).join('');
 }
 function renderServices(){
@@ -1079,7 +1098,8 @@ function closeEditModal(){document.getElementById('editModal').classList.remove(
 function openArticle(id){
   const n=news.find(x=>x.id===id); if(!n)return;
   document.getElementById('articleModalBody').innerHTML=
-    `<div style="font-size:3rem;text-align:center;margin-bottom:0.75rem;">${n.emoji}</div>`+
+    (n.image?`<img class="article-img" src="${escAttr(n.image)}" alt="" onerror="this.nextElementSibling.hidden=false;this.remove();"><div hidden style="font-size:3rem;text-align:center;margin-bottom:0.75rem;">${n.emoji}</div>`
+            :`<div style="font-size:3rem;text-align:center;margin-bottom:0.75rem;">${n.emoji}</div>`)+
     `<span class="news-tag" style="background:${n.color}18;color:${n.color};">${n.cat}</span>`+
     `<div class="news-date" style="margin-top:0.5rem;">${n.date}</div>`+
     `<h2 style="margin-top:0.5rem;">${n.title}</h2>`+
@@ -1094,10 +1114,10 @@ function newsForm(n={}){
   const cur=n.cat||'Actualités';
   const catList=cats.includes(cur)?cats:[cur,...cats];
   const catOptions=catList.map(c=>`<option value="${c}"${c===cur?' selected':''}>${c}</option>`).join('');
-  return `<div class="admin-form-group"><label>Titre</label><input id="ef_title" value="${n.title||''}" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:0.9rem;outline:none;"></div><div class="admin-form-row"><div class="admin-form-group"><label>Date</label><input id="ef_date" value="${n.date||''}" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:0.9rem;outline:none;"></div><div class="admin-form-group"><label>Catégorie</label><select id="ef_cat" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:0.9rem;outline:none;background:#fff;">${catOptions}</select></div></div><div class="admin-form-row"><div class="admin-form-group"><label>Emoji</label><input id="ef_emoji" value="${n.emoji||'📰'}" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:0.9rem;outline:none;"></div><div class="admin-form-group"><label>Couleur</label><input type="color" id="ef_color" value="${n.color||'#D4691E'}" style="height:42px;padding:4px;width:100%;border:2px solid #e5e7eb;border-radius:10px;"></div></div><div class="admin-form-group"><label>Contenu</label><textarea id="ef_content" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:0.9rem;outline:none;min-height:100px;resize:vertical;">${n.content||''}</textarea></div>`;
+  return `<div class="admin-form-group"><label>Titre</label><input id="ef_title" value="${n.title||''}" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:0.9rem;outline:none;"></div><div class="admin-form-row"><div class="admin-form-group"><label>Date</label><input id="ef_date" value="${n.date||''}" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:0.9rem;outline:none;"></div><div class="admin-form-group"><label>Catégorie</label><select id="ef_cat" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:0.9rem;outline:none;background:#fff;">${catOptions}</select></div></div><div class="admin-form-row"><div class="admin-form-group"><label>Emoji</label><input id="ef_emoji" value="${n.emoji||'📰'}" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:0.9rem;outline:none;"></div><div class="admin-form-group"><label>Couleur</label><input type="color" id="ef_color" value="${n.color||'#D4691E'}" style="height:42px;padding:4px;width:100%;border:2px solid #e5e7eb;border-radius:10px;"></div></div><div class="admin-form-group"><label>Image <span style="font-weight:400;color:var(--muted)">(optionnel — remplace l'emoji)</span></label><input type="file" accept="image/*" id="ef_file" onchange="handleImageFile(this,'ef_image')" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:0.9rem;outline:none;margin-bottom:0.5rem;"><input type="url" id="ef_image" value="${escAttr(n.image||'')}" placeholder="https://… ou envoyez un fichier ci-dessus" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:0.9rem;outline:none;"></div><div class="admin-form-group"><label>Contenu</label><textarea id="ef_content" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:0.9rem;outline:none;min-height:100px;resize:vertical;">${n.content||''}</textarea></div>`;
 }
-function openAddNews(){openEditModal('➕ Nouvelle actualité',newsForm(),()=>{news.unshift({id:Date.now(),title:v('ef_title'),date:v('ef_date'),cat:v('ef_cat'),emoji:v('ef_emoji'),color:v('ef_color'),content:v('ef_content')});apiSave('news',news);renderNews();renderAdminNews();closeEditModal();toast('Actualité ajoutée !');});}
-function editNews(id){const n=news.find(x=>x.id===id);openEditModal('✏️ Modifier l\'actualité',newsForm(n),()=>{Object.assign(n,{title:v('ef_title'),date:v('ef_date'),cat:v('ef_cat'),emoji:v('ef_emoji'),color:v('ef_color'),content:v('ef_content')});apiSave('news',news);renderNews();renderAdminNews();closeEditModal();toast('Modifié !');});}
+function openAddNews(){openEditModal('➕ Nouvelle actualité',newsForm(),()=>{news.unshift({id:Date.now(),title:v('ef_title'),date:v('ef_date'),cat:v('ef_cat'),emoji:v('ef_emoji'),color:v('ef_color'),content:v('ef_content'),image:v('ef_image')});apiSave('news',news);renderNews();renderAdminNews();closeEditModal();toast('Actualité ajoutée !');});}
+function editNews(id){const n=news.find(x=>x.id===id);openEditModal('✏️ Modifier l\'actualité',newsForm(n),()=>{Object.assign(n,{title:v('ef_title'),date:v('ef_date'),cat:v('ef_cat'),emoji:v('ef_emoji'),color:v('ef_color'),content:v('ef_content'),image:v('ef_image')});apiSave('news',news);renderNews();renderAdminNews();closeEditModal();toast('Modifié !');});}
 function delNews(id){if(!confirm('Supprimer ?'))return;news=news.filter(x=>x.id!==id);apiSave('news',news);renderNews();renderAdminNews();toast('Supprimé !');}
 
 function serviceForm(s={}){return `<div class="admin-form-row"><div class="admin-form-group"><label>Emoji</label><input id="sf_emoji" value="${s.emoji||'⭐'}" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div><div class="admin-form-group"><label>Titre</label><input id="sf_title" value="${s.title||''}" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div></div><div class="admin-form-group"><label>Description</label><textarea id="sf_desc" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;min-height:100px;resize:vertical;">${s.desc||''}</textarea></div>`;}
@@ -1105,7 +1125,7 @@ function openAddService(){openEditModal('➕ Nouveau service',serviceForm(),()=>
 function editService(id){const s=services.find(x=>x.id===id);openEditModal('✏️ Modifier',serviceForm(s),()=>{Object.assign(s,{emoji:v('sf_emoji'),title:v('sf_title'),desc:v('sf_desc')});apiSave('services',services);renderServices();renderAdminServices();closeEditModal();toast('Modifié !');});}
 function delService(id){if(!confirm('Supprimer ?'))return;services=services.filter(x=>x.id!==id);apiSave('services',services);renderServices();renderAdminServices();toast('Supprimé !');}
 
-function openAddGallery(){openEditModal('➕ Photo',`<div class="admin-form-group"><label>Label</label><input id="gf_label" placeholder="Atelier peinture" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div><div class="admin-form-group"><label>Emoji</label><input id="gf_emoji" placeholder="🎨" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div><div class="admin-form-group"><label>URL image (optionnel)</label><input type="url" id="gf_url" placeholder="https://..." style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div>`,()=>{gallery.push({id:Date.now(),label:v('gf_label'),emoji:v('gf_emoji'),url:v('gf_url')});apiSave('gallery',gallery);renderGallery();renderAdminGallery();closeEditModal();toast('Photo ajoutée !');});}
+function openAddGallery(){openEditModal('➕ Photo',`<div class="admin-form-group"><label>Label</label><input id="gf_label" placeholder="Atelier peinture" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div><div class="admin-form-group"><label>Emoji</label><input id="gf_emoji" placeholder="🎨" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div><div class="admin-form-group"><label>Envoyer une image</label><input type="file" accept="image/*" id="gf_file" onchange="handleImageFile(this,'gf_url')" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div><div class="admin-form-group"><label>URL image (optionnel)</label><input type="url" id="gf_url" placeholder="https://..." style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div>`,()=>{gallery.push({id:Date.now(),label:v('gf_label'),emoji:v('gf_emoji'),url:v('gf_url')});apiSave('gallery',gallery);renderGallery();renderAdminGallery();closeEditModal();toast('Photo ajoutée !');});}
 function delGallery(id){if(!confirm('Supprimer ?'))return;gallery=gallery.filter(x=>x.id!==id);apiSave('gallery',gallery);renderGallery();renderAdminGallery();toast('Supprimé !');}
 
 function temoignageForm(t={}){return `<div class="admin-form-row"><div class="admin-form-group"><label>Nom</label><input id="tf_name" value="${t.name||''}" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div><div class="admin-form-group"><label>Date</label><input id="tf_date" value="${t.date||''}" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div></div><div class="admin-form-row"><div class="admin-form-group"><label>Initiale</label><input id="tf_initial" value="${t.initial||'A'}" maxlength="1" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"></div><div class="admin-form-group"><label>Couleur avatar</label><input type="color" id="tf_color" value="${t.color||'#D4691E'}" style="height:42px;padding:4px;width:100%;border:2px solid #e5e7eb;border-radius:10px;"></div></div><div class="admin-form-group"><label>Note</label><select id="tf_stars" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;"><option ${t.stars==5?'selected':''}  value="5">⭐⭐⭐⭐⭐</option><option ${t.stars==4?'selected':''}  value="4">⭐⭐⭐⭐</option><option ${t.stars==3?'selected':''}  value="3">⭐⭐⭐</option></select></div><div class="admin-form-group"><label>Témoignage</label><textarea id="tf_text" style="width:100%;border:2px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Nunito',sans-serif;outline:none;min-height:100px;resize:vertical;">${t.text||''}</textarea></div>`;}
