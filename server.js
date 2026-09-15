@@ -7,6 +7,8 @@ const rateLimit    = require('express-rate-limit');
 const bcrypt       = require('bcryptjs');
 const jwt          = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
+const multer       = require('multer');
+const crypto       = require('crypto');
 const fs           = require('fs');
 const path         = require('path');
 
@@ -25,9 +27,11 @@ const isProd = process.env.NODE_ENV === 'production';
 const DATA_DIR   = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DATA_FILE  = path.join(DATA_DIR, 'content.json');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const UPLOADS_DIR = path.join(DATA_DIR, 'uploads'); // même volume persistant que les données
 
 // Initialisation du dossier de données (volume persistant Railway le cas échéant)
 fs.mkdirSync(DATA_DIR, { recursive: true });
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 if (!fs.existsSync(DATA_FILE)) {
   fs.writeFileSync(DATA_FILE, '{}');
 }
@@ -132,6 +136,14 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+// Images uploadées (servies depuis le volume de données, jamais depuis __dirname)
+app.use('/uploads', express.static(UPLOADS_DIR, {
+  maxAge: '30d',
+  index: false,
+  dotfiles: 'ignore',
+}));
+app.use('/uploads', (req, res) => res.status(404).end());
 
 app.use(express.static(__dirname, {
   index: 'index.html',
@@ -338,6 +350,94 @@ app.post('/api/change-password', requireAuth, async (req, res) => {
   log('info', 'password_changed', { username: req.admin.username });
   res.clearCookie('jey_token', { path: '/' });
   res.json({ ok: true, relogin: true });
+});
+
+// ── Upload d'images (actualités, galerie) ────────────────────────────────────
+
+// Types acceptés et extensions cohérentes pour chacun
+const IMAGE_TYPES = {
+  'image/jpeg': ['.jpg', '.jpeg'],
+  'image/png':  ['.png'],
+  'image/webp': ['.webp'],
+  'image/gif':  ['.gif'],
+};
+const MAX_UPLOAD_SIZE = 5 * 1024 * 1024; // 5 Mo
+
+function uploadRejected(message) {
+  const err = new Error(message);
+  err.code = 'UPLOAD_REJECTED';
+  return err;
+}
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: UPLOADS_DIR,
+    filename: (req, file, cb) => {
+      cb(null, crypto.randomBytes(16).toString('hex') + path.extname(file.originalname).toLowerCase());
+    },
+  }),
+  limits: { fileSize: MAX_UPLOAD_SIZE, files: 1 },
+  fileFilter: (req, file, cb) => {
+    const exts = IMAGE_TYPES[file.mimetype];
+    if (!exts) {
+      return cb(uploadRejected('Type de fichier refusé (JPEG, PNG, WebP ou GIF uniquement)'));
+    }
+    // Empêche par ex. un "page.html" déclaré image/png d'être servi comme HTML
+    if (!exts.includes(path.extname(file.originalname).toLowerCase())) {
+      return cb(uploadRejected('Extension du fichier incohérente avec le type d\'image'));
+    }
+    cb(null, true);
+  },
+});
+
+// Le mimetype envoyé par le client est déclaratif : on vérifie la signature réelle du fichier
+function hasImageSignature(filePath, mimetype) {
+  const buf = Buffer.alloc(12);
+  const fd  = fs.openSync(filePath, 'r');
+  try { fs.readSync(fd, buf, 0, 12, 0); } finally { fs.closeSync(fd); }
+  switch (mimetype) {
+    case 'image/jpeg': return buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF;
+    case 'image/png':  return buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]));
+    case 'image/gif':  return ['GIF87a', 'GIF89a'].includes(buf.toString('latin1', 0, 6));
+    case 'image/webp': return buf.toString('latin1', 0, 4) === 'RIFF' && buf.toString('latin1', 8, 12) === 'WEBP';
+    default:           return false;
+  }
+}
+
+const MULTER_MESSAGES = {
+  LIMIT_FILE_SIZE:       'Image trop volumineuse (5 Mo maximum)',
+  LIMIT_FILE_COUNT:      'Un seul fichier à la fois',
+  LIMIT_UNEXPECTED_FILE: 'Fichier attendu dans le champ "image"',
+};
+
+app.post('/api/upload', requireAuth, (req, res, next) => {
+  upload.single('image')(req, res, err => {
+    if (err) {
+      // multer supprime lui-même les fichiers partiellement écrits en cas d'erreur
+      // Erreur disque / système : pas la faute du client
+      if (err.syscall) return next(err);
+      const message = err instanceof multer.MulterError
+        ? (MULTER_MESSAGES[err.code] || 'Upload invalide')
+        : err.code === 'UPLOAD_REJECTED' ? err.message : 'Requête d\'upload invalide';
+      log('warn', 'upload_rejected', { username: req.admin.username, reason: err.code || err.message });
+      return res.status(400).json({ error: message });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Aucune image reçue (champ "image")' });
+    }
+
+    let valid = false;
+    try { valid = hasImageSignature(req.file.path, req.file.mimetype); } catch {}
+    if (!valid) {
+      fs.rm(req.file.path, { force: true }, () => {});
+      log('warn', 'upload_rejected', { username: req.admin.username, reason: 'bad_signature', mimetype: req.file.mimetype });
+      return res.status(400).json({ error: 'Le contenu du fichier ne correspond pas à une image valide' });
+    }
+
+    log('info', 'image_uploaded', { username: req.admin.username, file: req.file.filename, size: req.file.size });
+    res.json({ ok: true, url: '/uploads/' + req.file.filename });
+  });
 });
 
 // ── Routes protégées — super_admin uniquement ────────────────────────────────
