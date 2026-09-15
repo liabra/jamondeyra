@@ -108,6 +108,21 @@ const loginLimiter = rateLimit({
   },
 });
 
+// Rate limiting sur le changement de mot de passe — 5 tentatives / 15 min par compte
+// (placé après requireAuth : req.admin est déjà renseigné)
+const changePasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  skipSuccessfulRequests: true, // Ne compte pas les changements réussis
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.admin.username,
+  handler: (req, res) => {
+    log('warn', 'change_password_rate_limited', { ip: req.ip, username: req.admin.username });
+    res.status(429).json({ error: 'Trop de tentatives. Réessayez dans 15 minutes.' });
+  },
+});
+
 // Rate limiting général API — 120 req / min (protection contre abus)
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -318,7 +333,7 @@ app.post('/api/save', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/change-password', requireAuth, loginLimiter, async (req, res) => {
+app.post('/api/change-password', requireAuth, changePasswordLimiter, async (req, res) => {
   const { currentPassword, newPassword } = req.body || {};
 
   if (!newPassword || typeof newPassword !== 'string'
