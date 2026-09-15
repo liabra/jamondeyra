@@ -706,11 +706,12 @@
   </div>
   <div class="admin-body">
     <div class="admin-tabs">
-      <button class="admin-tab active" onclick="switchTab('news')">📰 Actualités</button>
+      <button class="admin-tab active" id="tab-btn-news" onclick="switchTab('news')">📰 Actualités</button>
       <button class="admin-tab" onclick="switchTab('services')">✨ Services</button>
       <button class="admin-tab" onclick="switchTab('gallery')">📸 Galerie</button>
       <button class="admin-tab" onclick="switchTab('temoignages')">⭐ Témoignages</button>
       <button class="admin-tab" onclick="switchTab('drive')">📁 Espace parents</button>
+      <button class="admin-tab" id="tab-btn-moncompte" onclick="switchTab('moncompte')">🔑 Mon compte</button>
       <button class="admin-tab" id="tab-btn-settings" onclick="switchTab('settings')">⚙️ Paramètres</button>
       <button class="admin-tab" id="tab-btn-comptes" onclick="switchTab('comptes')">👥 Comptes</button>
     </div>
@@ -727,7 +728,7 @@
       <div class="admin-card"><h3>⭐ Gérer les témoignages</h3><button class="btn-add" onclick="openAddTemoignage()">+ Nouveau témoignage</button><div class="items-list" id="adminTemoignagesList"></div></div>
     </div>
     <div class="admin-section" id="tab-drive">
-      <div class="admin-card">
+      <div class="admin-card" id="parentPwCard">
         <h3>🔒 Accès parents</h3>
         <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1rem;">Mot de passe unique partagé avec les familles. <span id="parentPwStatus"></span></p>
         <div class="admin-form-group"><label>Nouveau mot de passe parents (6 caractères min)</label><input type="text" id="parentPwInput" placeholder="ex. ecole2026"></div>
@@ -745,6 +746,18 @@
         <button class="btn-add" onclick="openAddDriveCard()">+ Ajouter un raccourci</button>
         <div class="items-list" id="adminParentDriveList"></div>
         <button class="btn-save" onclick="saveParentDrive()">💾 Enregistrer les documents</button>
+      </div>
+    </div>
+    <div class="admin-section" id="tab-moncompte">
+      <div class="admin-card">
+        <h3>🔑 Mon compte</h3>
+        <div class="admin-form-row">
+          <div class="admin-form-group"><label>Nom d'utilisateur</label><input type="text" id="myAccountUsername" readonly></div>
+          <div class="admin-form-group"><label>Rôle</label><input type="text" id="myAccountRole" readonly></div>
+        </div>
+        <div class="admin-form-group"><label>Mot de passe actuel</label><input type="password" id="myCurrentPwd" placeholder="Votre mot de passe actuel" autocomplete="current-password"></div>
+        <div class="admin-form-group"><label>Nouveau mot de passe</label><input type="password" id="myNewPwd" placeholder="8 caractères minimum" autocomplete="new-password"></div>
+        <button class="btn-save" onclick="saveMyPassword()">🔑 Changer mon mot de passe</button>
       </div>
     </div>
     <div class="admin-section" id="tab-settings">
@@ -778,10 +791,6 @@
           <div class="admin-form-group"><label>Instagram</label><input type="url" id="settingIg" placeholder="https://instagram.com/..."></div>
         </div>
 
-        <hr style="border:none;border-top:1px solid #e5e7eb;margin:1.5rem 0;">
-        <h3>🔒 Sécurité</h3>
-        <div class="admin-form-group"><label>Mot de passe actuel <span style="font-weight:400;color:var(--muted)">(requis pour changer)</span></label><input type="password" id="settingCurrentPwd" placeholder="Votre mot de passe actuel"></div>
-        <div class="admin-form-group"><label>Nouveau mot de passe <span style="font-weight:400;color:var(--muted)">(laisser vide pour ne pas changer)</span></label><input type="password" id="settingPwd" placeholder="8 caractères minimum"></div>
         <button class="btn-save" onclick="saveSettings()">💾 Enregistrer</button>
       </div>
     </div>
@@ -1000,6 +1009,19 @@ async function openAdmin(){
   const tC=document.getElementById('tab-btn-comptes');
   if(tS)tS.style.display=isSA?'':'none';
   if(tC)tC.style.display=isSA?'':'none';
+  const pC=document.getElementById('parentPwCard');
+  if(pC)pC.style.display=isSA?'':'none';
+  // Onglet Mon compte
+  document.getElementById('myAccountUsername').value=currentUser.username;
+  document.getElementById('myAccountRole').value=isSA?'Super admin':'Éditeur';
+  document.getElementById('myCurrentPwd').value='';
+  document.getElementById('myNewPwd').value='';
+  // Reset de la navigation : chaque connexion repart sur Actualités
+  document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.admin-section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('tab-btn-news').classList.add('active');
+  document.getElementById('tab-news').classList.add('active');
+  if(!isSA)document.getElementById('adminUsersList').innerHTML='';
   document.getElementById('adminPanel').classList.add('active');
   renderAdminAll();
 }
@@ -1007,6 +1029,7 @@ function closeAdmin(){document.getElementById('adminPanel').classList.remove('ac
 async function logout(){await fetch('/api/logout',{method:'POST'}).catch(()=>{});currentUser={username:'',role:''};closeAdmin();}
 
 function switchTab(tab){
+  if((tab==='comptes'||tab==='settings')&&currentUser.role!=='super_admin'){toast('⚠️ Accès réservé à l\'administrateur');return;}
   document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active'));
   const btn=document.getElementById('tab-btn-'+tab);
   if(btn)btn.classList.add('active');
@@ -1123,25 +1146,24 @@ function editParentMsg(id){const m=parentMessages.find(x=>x.id===id);openEditMod
 function delParentMsg(id){if(!confirm('Supprimer ce message ?'))return;parentMessages=parentMessages.filter(x=>x.id!==id);saveParentMessages();renderParentAdmin();toast('Supprimé !');}
 function saveDrive(){driveData.link=document.getElementById('driveLinkInput').value;apiSave('drive',driveData);renderDrive();toast('Drive enregistré !');}
 
-async function saveSettings(){
+function saveSettings(){
   if(currentUser.role!=='super_admin'){toast('⚠️ Accès refusé');return;}
   settings={name:v('settingName'),address1:v('settingAddress1'),address2:v('settingAddress2'),zip:v('settingZip'),city:v('settingCity'),phone:v('settingPhone'),email:v('settingEmail'),hours:v('settingHours'),infos:v('settingInfos'),mapsUrl:v('settingMapsUrl'),fb:v('settingFb'),ig:v('settingIg')};
   apiSave('settings',settings);
   renderContact();
-  const np=v('settingPwd');
-  if(np){
-    if(np.length<8){toast('⚠️ Mot de passe trop court (8 caractères min)');return;}
-    const cp=v('settingCurrentPwd');
-    if(!cp){toast('⚠️ Entrez votre mot de passe actuel');return;}
-    const r=await fetch('/api/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({currentPassword:cp,newPassword:np})});
-    if(!r.ok){const e=await r.json();toast('⚠️ '+(e.error||'Erreur'));return;}
-    document.getElementById('settingPwd').value='';
-    document.getElementById('settingCurrentPwd').value='';
-    toast('Mot de passe mis à jour. Reconnectez-vous.');
-    setTimeout(()=>logout(),1500);
-    return;
-  }
   toast('Paramètres enregistrés !');
+}
+async function saveMyPassword(){
+  const np=v('myNewPwd');
+  if(!np||np.length<8){toast('⚠️ Mot de passe trop court (8 caractères min)');return;}
+  const cp=v('myCurrentPwd');
+  if(!cp){toast('⚠️ Entrez votre mot de passe actuel');return;}
+  const r=await fetch('/api/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({currentPassword:cp,newPassword:np})});
+  if(!r.ok){const e=await r.json();toast('⚠️ '+(e.error||'Erreur'));return;}
+  document.getElementById('myNewPwd').value='';
+  document.getElementById('myCurrentPwd').value='';
+  toast('Mot de passe mis à jour. Reconnectez-vous.');
+  setTimeout(()=>logout(),1500);
 }
 function submitContact(){toast('Message envoyé ! Nous vous répondrons rapidement. 😊');}
 function v(id){const el=document.getElementById(id);return el?el.value:'';}
