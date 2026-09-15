@@ -17,5 +17,5 @@ jobs:
           script: |
             cd ~/jamondeyra
             git pull
-            npm install --production
+            npm ci --omit=dev
             pm2 restart jamondeyra
