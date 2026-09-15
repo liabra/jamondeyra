@@ -318,7 +318,7 @@ app.post('/api/save', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/change-password', requireAuth, async (req, res) => {
+app.post('/api/change-password', requireAuth, loginLimiter, async (req, res) => {
   const { currentPassword, newPassword } = req.body || {};
 
   if (!newPassword || typeof newPassword !== 'string'
